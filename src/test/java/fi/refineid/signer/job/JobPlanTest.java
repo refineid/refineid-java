@@ -56,6 +56,13 @@ class JobPlanTest {
   }
 
   @Test
+  @DisplayName("two prompts read as twice, not as PIN 2 2 times")
+  void twoReadsProperly() {
+    JobPlan plan = new JobPlan(THREE.subList(0, 2), JobShape.EACH_DOCUMENT);
+    assertTrue(plan.summary().contains("twice"), plan.summary());
+  }
+
+  @Test
   @DisplayName("a job with nothing in it is refused rather than run")
   void emptyJobRefused() {
     assertThrows(

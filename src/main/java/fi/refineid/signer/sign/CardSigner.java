@@ -51,6 +51,21 @@ public final class CardSigner implements AutoCloseable {
    * gets signed with the key meant for logging in.
    */
   public static CardSigner open(Path module) throws SigningFailedException {
+    return open(module, null);
+  }
+
+  /**
+   * Opens the card with the PIN supplied by the caller instead of by
+   * the system dialog.
+   *
+   * <p>For a session that cannot answer a dialog -- headless, remote,
+   * a test -- where the module is run with textual PIN entry and
+   * withdraws its protected-authentication-path flag. The value is
+   * held only for the call that hands it to the module, which passes
+   * it to the card as an authentication context; nothing here stores
+   * it, writes it, or puts it in a message.
+   */
+  public static CardSigner open(Path module, char[] pin) throws SigningFailedException {
     Pkcs11SignatureToken token = null;
     try {
       // Selected by position in the slot list, not by slot number. The
@@ -59,8 +74,8 @@ public final class CardSigner implements AutoCloseable {
       // slot that does not exist yet and the card answers
       // CKR_SLOT_ID_INVALID. A negative slot id is how DSS is told to
       // use the index instead.
-      token = new Pkcs11SignatureToken(
-          module.toString(), (PasswordInputCallback) null, -1, 0, null);
+      PasswordInputCallback password = pin == null ? null : () -> pin;
+      token = new Pkcs11SignatureToken(module.toString(), password, -1, 0, null);
       List<DSSPrivateKeyEntry> keys = token.getKeys();
       if (keys.size() != 1) {
         throw new SigningFailedException(

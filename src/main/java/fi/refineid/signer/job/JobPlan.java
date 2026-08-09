@@ -47,9 +47,11 @@ public record JobPlan(List<Path> documents, JobShape shape) {
     String documentCount = documents.size() == 1
         ? "1 document"
         : documents.size() + " documents";
-    String promptCount = prompts == 1
-        ? "PIN 2 once"
-        : "PIN 2 " + prompts + " times";
+    String promptCount = switch (prompts) {
+      case 1 -> "PIN 2 once";
+      case 2 -> "PIN 2 twice";
+      default -> "PIN 2 " + prompts + " times";
+    };
     return switch (shape) {
       case ONE_CONTAINER ->
           documentCount + " in one signed container; the card will ask for " + promptCount;
