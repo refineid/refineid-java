@@ -3,6 +3,7 @@ package fi.refineid.signer.ui;
 import fi.refineid.signer.job.DocumentOutcome;
 import fi.refineid.signer.job.JobPlan;
 import fi.refineid.signer.job.JobShape;
+import fi.refineid.signer.job.PinPolicy;
 import fi.refineid.signer.job.SigningJob;
 import fi.refineid.signer.sign.CardSigner;
 import fi.refineid.signer.sign.SigningFailedException;
@@ -151,7 +152,21 @@ public final class SignerApp extends Application {
       plan.setText("");
       return;
     }
-    plan.setText(new JobPlan(documents, selectedShape()).summary());
+    plan.setText(new JobPlan(documents, selectedShape(), pinPolicy()).summary());
+  }
+
+  /**
+   * How PIN 2 will be collected on this run.
+   *
+   * <p>Asking once for a whole job needs the module started with
+   * textual PIN entry; otherwise the system dialog collects it and
+   * appears for every signature, and the window must not promise
+   * otherwise.
+   */
+  private PinPolicy pinPolicy() {
+    return "textual".equalsIgnoreCase(System.getenv("REFINEID_PKCS11_PIN_ENTRY"))
+        ? PinPolicy.ASK_ONCE_FOR_THE_JOB
+        : PinPolicy.ASK_EACH_SIGNATURE;
   }
 
   private JobShape selectedShape() {
@@ -178,7 +193,7 @@ public final class SignerApp extends Application {
    * would look like a window that had crashed.
    */
   private void signAll() {
-    JobPlan job = new JobPlan(documents, selectedShape());
+    JobPlan job = new JobPlan(documents, selectedShape(), pinPolicy());
     results.getItems().clear();
     sign.setDisable(true);
     cancelled = false;

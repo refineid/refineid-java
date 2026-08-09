@@ -3,6 +3,7 @@ package fi.refineid.signer.job;
 import fi.refineid.signer.sign.CardSigner;
 import fi.refineid.signer.sign.SigningFailedException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -58,7 +59,8 @@ public final class SigningJob {
 
   /** One signature over everything: the card asks once. */
   private List<DocumentOutcome> runAsContainer(JobPlan plan, Progress progress) {
-    Path container = destination.resolve(containerName(plan));
+    Path container = destination.resolve(
+        SignedName.name(plan.documents().getFirst(), Instant.now(), "asice"));
     Path first = plan.documents().getFirst();
     progress.starting(first, 1, 1);
     try {
@@ -102,14 +104,15 @@ public final class SigningJob {
   private DocumentOutcome signOne(Path document, Progress progress) {
     DocumentOutcome outcome;
     try {
+      Instant signedAt = Instant.now();
       if (isPdf(document)) {
-        Path output = destination.resolve(signedName(document, ".pdf"));
+        Path output = destination.resolve(SignedName.name(document, signedAt, "pdf"));
         signer.signPdf(document, output);
         outcome = new DocumentOutcome.Signed(document, output);
       } else {
         // Only a PDF can carry a PAdES signature. Anything else keeps
         // its own container rather than being quietly left unsigned.
-        Path output = destination.resolve(signedName(document, ".asice"));
+        Path output = destination.resolve(SignedName.name(document, signedAt, "asice"));
         signer.signContainer(List.of(document), output);
         outcome = new DocumentOutcome.Signed(document, output);
       }
@@ -124,21 +127,7 @@ public final class SigningJob {
     return document.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".pdf");
   }
 
-  /** The signed file's name, beside the original rather than over it. */
-  private static String signedName(Path document, String extension) {
-    String name = document.getFileName().toString();
-    int dot = name.lastIndexOf('.');
-    String stem = dot > 0 ? name.substring(0, dot) : name;
-    return stem + "-signed" + extension;
-  }
 
-  private static String containerName(JobPlan plan) {
-    Path first = plan.documents().getFirst();
-    String name = first.getFileName().toString();
-    int dot = name.lastIndexOf('.');
-    String stem = dot > 0 ? name.substring(0, dot) : name;
-    return plan.documents().size() == 1 ? stem + "-signed.asice" : stem + "-and-others.asice";
-  }
 
   /** The failure as one sentence, with the cause when it adds anything. */
   private static String reason(SigningFailedException failure) {

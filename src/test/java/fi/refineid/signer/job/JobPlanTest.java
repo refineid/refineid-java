@@ -26,7 +26,7 @@ class JobPlanTest {
   @Test
   @DisplayName("a container over many documents is one signature and one PIN 2")
   void containerAsksOnce() {
-    JobPlan plan = new JobPlan(THREE, JobShape.ONE_CONTAINER);
+    JobPlan plan = new JobPlan(THREE, JobShape.ONE_CONTAINER, PinPolicy.ASK_EACH_SIGNATURE);
     assertEquals(1, plan.signatureCount());
     assertEquals(1, plan.pinEntries());
   }
@@ -34,7 +34,7 @@ class JobPlanTest {
   @Test
   @DisplayName("documents signed separately cost one PIN 2 each")
   void separateAsksPerDocument() {
-    JobPlan plan = new JobPlan(THREE, JobShape.EACH_DOCUMENT);
+    JobPlan plan = new JobPlan(THREE, JobShape.EACH_DOCUMENT, PinPolicy.ASK_EACH_SIGNATURE);
     assertEquals(3, plan.signatureCount());
     assertEquals(3, plan.pinEntries());
   }
@@ -42,14 +42,14 @@ class JobPlanTest {
   @Test
   @DisplayName("the summary says the number of prompts, not just the number of files")
   void summaryNamesThePrompts() {
-    assertTrue(new JobPlan(THREE, JobShape.EACH_DOCUMENT).summary().contains("3 times"));
-    assertTrue(new JobPlan(THREE, JobShape.ONE_CONTAINER).summary().contains("once"));
+    assertTrue(new JobPlan(THREE, JobShape.EACH_DOCUMENT, PinPolicy.ASK_EACH_SIGNATURE).summary().contains("3 times"));
+    assertTrue(new JobPlan(THREE, JobShape.ONE_CONTAINER, PinPolicy.ASK_EACH_SIGNATURE).summary().contains("once"));
   }
 
   @Test
   @DisplayName("one document reads as one document, not as 1 documents")
   void singularReadsProperly() {
-    JobPlan plan = new JobPlan(List.of(Path.of("contract.pdf")), JobShape.EACH_DOCUMENT);
+    JobPlan plan = new JobPlan(List.of(Path.of("contract.pdf")), JobShape.EACH_DOCUMENT, PinPolicy.ASK_EACH_SIGNATURE);
     assertFalse(plan.summary().contains("1 documents"), plan.summary());
     assertTrue(plan.summary().contains("1 document "), plan.summary());
     assertTrue(plan.summary().contains("once"), plan.summary());
@@ -58,14 +58,23 @@ class JobPlanTest {
   @Test
   @DisplayName("two prompts read as twice, not as PIN 2 2 times")
   void twoReadsProperly() {
-    JobPlan plan = new JobPlan(THREE.subList(0, 2), JobShape.EACH_DOCUMENT);
+    JobPlan plan = new JobPlan(THREE.subList(0, 2), JobShape.EACH_DOCUMENT, PinPolicy.ASK_EACH_SIGNATURE);
     assertTrue(plan.summary().contains("twice"), plan.summary());
+  }
+
+  @Test
+  @DisplayName("a PIN held for the job is typed once however many signatures are made")
+  void heldPinIsTypedOnce() {
+    JobPlan plan = new JobPlan(THREE, JobShape.EACH_DOCUMENT, PinPolicy.ASK_ONCE_FOR_THE_JOB);
+    assertEquals(3, plan.signatureCount(), "the card still verifies before every signature");
+    assertEquals(1, plan.pinEntries(), "but the holder types it once");
+    assertTrue(plan.summary().contains("once"), plan.summary());
   }
 
   @Test
   @DisplayName("a job with nothing in it is refused rather than run")
   void emptyJobRefused() {
     assertThrows(
-        IllegalArgumentException.class, () -> new JobPlan(List.of(), JobShape.EACH_DOCUMENT));
+        IllegalArgumentException.class, () -> new JobPlan(List.of(), JobShape.EACH_DOCUMENT, PinPolicy.ASK_EACH_SIGNATURE));
   }
 }

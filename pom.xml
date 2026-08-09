@@ -53,6 +53,14 @@
       <version>${dss.version}</version>
     </dependency>
 
+    <!-- Fetching a timestamp from an authority, and the network
+         clients DSS uses to do it. -->
+    <dependency>
+      <groupId>eu.europa.ec.joinup.sd-dss</groupId>
+      <artifactId>dss-service</artifactId>
+      <version>${dss.version}</version>
+    </dependency>
+
     <!-- Reading a signature back, which is how a signed document is
          checked rather than assumed. -->
     <dependency>

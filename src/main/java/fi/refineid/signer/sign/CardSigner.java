@@ -11,6 +11,7 @@ import eu.europa.esig.dss.model.SignatureValue;
 import eu.europa.esig.dss.model.ToBeSigned;
 import eu.europa.esig.dss.pades.PAdESSignatureParameters;
 import eu.europa.esig.dss.pades.signature.PAdESService;
+import eu.europa.esig.dss.service.tsp.OnlineTSPSource;
 import eu.europa.esig.dss.spi.validation.CommonCertificateVerifier;
 import eu.europa.esig.dss.token.DSSPrivateKeyEntry;
 import eu.europa.esig.dss.token.PasswordInputCallback;
@@ -29,6 +30,18 @@ import java.util.List;
  * this twelve times and the holder answers twelve times.
  */
 public final class CardSigner implements AutoCloseable {
+
+  /**
+   * The timestamp authority a signature is stamped by, the same one
+   * the rest of ReFineID uses.
+   *
+   * <p>Without a timestamp a signature carries only the time the
+   * signing computer claimed, which no one has to believe, and a
+   * validator says so: DVV reports such a signature as not validated
+   * by a time stamp authority. The stamp is what fixes the signature
+   * in time independently of this machine.
+   */
+  public static final String TIMESTAMP_AUTHORITY = "http://timestamp.sectigo.com/qualified";
 
   /** Where the signing module is installed on macOS. */
   public static final Path INSTALLED_MODULE =
@@ -144,12 +157,13 @@ public final class CardSigner implements AutoCloseable {
     try {
       DSSDocument toSign = new FileDocument(document.toFile());
       PAdESSignatureParameters parameters = new PAdESSignatureParameters();
-      parameters.setSignatureLevel(SignatureLevel.PAdES_BASELINE_B);
+      parameters.setSignatureLevel(SignatureLevel.PAdES_BASELINE_T);
       parameters.setDigestAlgorithm(DigestAlgorithm.SHA256);
       parameters.setSigningCertificate(key.getCertificate());
       parameters.setCertificateChain(key.getCertificateChain());
 
       PAdESService service = new PAdESService(new CommonCertificateVerifier());
+      service.setTspSource(new OnlineTSPSource(TIMESTAMP_AUTHORITY));
       ToBeSigned dataToSign = service.getDataToSign(toSign, parameters);
       SignatureValue signature = token.sign(dataToSign, parameters.getDigestAlgorithm(), key);
       service.signDocument(toSign, parameters, signature).save(output.toString());
@@ -168,13 +182,14 @@ public final class CardSigner implements AutoCloseable {
           .map(path -> (DSSDocument) new FileDocument(path.toFile()))
           .toList();
       ASiCWithXAdESSignatureParameters parameters = new ASiCWithXAdESSignatureParameters();
-      parameters.setSignatureLevel(SignatureLevel.XAdES_BASELINE_B);
+      parameters.setSignatureLevel(SignatureLevel.XAdES_BASELINE_T);
       parameters.setDigestAlgorithm(DigestAlgorithm.SHA256);
       parameters.aSiC().setContainerType(ASiCContainerType.ASiC_E);
       parameters.setSigningCertificate(key.getCertificate());
       parameters.setCertificateChain(key.getCertificateChain());
 
       ASiCWithXAdESService service = new ASiCWithXAdESService(new CommonCertificateVerifier());
+      service.setTspSource(new OnlineTSPSource(TIMESTAMP_AUTHORITY));
       ToBeSigned dataToSign = service.getDataToSign(toSign, parameters);
       SignatureValue signature = token.sign(dataToSign, parameters.getDigestAlgorithm(), key);
       service.signDocument(toSign, parameters, signature).save(output.toString());

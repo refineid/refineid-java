@@ -14,8 +14,9 @@ import java.util.List;
  *
  * @param documents what will be signed, in the order it will be signed
  * @param shape whether this is one signature or one per document
+ * @param pin whether the holder types PIN 2 once or for every signature
  */
-public record JobPlan(List<Path> documents, JobShape shape) {
+public record JobPlan(List<Path> documents, JobShape shape, PinPolicy pin) {
 
   public JobPlan {
     documents = List.copyOf(documents);
@@ -25,9 +26,9 @@ public record JobPlan(List<Path> documents, JobShape shape) {
   }
 
   /**
-   * How many signatures the card will make, which is also how many
-   * times it will ask for PIN 2: the card verifies it per signature
-   * and never caches it (ADR-0007).
+   * How many signatures the card will make, and therefore how many
+   * times it verifies PIN 2 -- which is not the same as how many times
+   * anyone types it.
    */
   public int signatureCount() {
     return switch (shape) {
@@ -36,9 +37,12 @@ public record JobPlan(List<Path> documents, JobShape shape) {
     };
   }
 
-  /** The same number under the name the holder cares about. */
+  /**
+   * How many times the holder types PIN 2, which is the number that
+   * belongs in front of them.
+   */
   public int pinEntries() {
-    return signatureCount();
+    return pin == PinPolicy.ASK_ONCE_FOR_THE_JOB ? 1 : signatureCount();
   }
 
   /** One sentence to put in front of a holder before starting. */
@@ -52,11 +56,10 @@ public record JobPlan(List<Path> documents, JobShape shape) {
       case 2 -> "PIN 2 twice";
       default -> "PIN 2 " + prompts + " times";
     };
-    return switch (shape) {
-      case ONE_CONTAINER ->
-          documentCount + " in one signed container; the card will ask for " + promptCount;
-      case EACH_DOCUMENT ->
-          documentCount + " signed separately; the card will ask for " + promptCount;
+    String work = switch (shape) {
+      case ONE_CONTAINER -> documentCount + " in one signed container";
+      case EACH_DOCUMENT -> documentCount + " signed separately";
     };
+    return work + "; you will be asked for " + promptCount;
   }
 }
