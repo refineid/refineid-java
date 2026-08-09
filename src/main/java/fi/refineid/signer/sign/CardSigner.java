@@ -16,6 +16,7 @@ import eu.europa.esig.dss.token.DSSPrivateKeyEntry;
 import eu.europa.esig.dss.token.PasswordInputCallback;
 import eu.europa.esig.dss.token.Pkcs11SignatureToken;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.List;
 
 /**
@@ -29,9 +30,21 @@ import java.util.List;
  */
 public final class CardSigner implements AutoCloseable {
 
-  /** Where the modules live on macOS, most specific first. */
-  public static final Path DEFAULT_MODULE =
+  /** Where the signing module is installed on macOS. */
+  public static final Path INSTALLED_MODULE =
       Path.of("/usr/local/lib/librefineid_pkcs11_sign.dylib");
+
+  /** Names a module somewhere else, for a build under test. */
+  public static final String MODULE_PROPERTY = "refineid.module";
+
+  /**
+   * The module this run will use: the installed one unless another was
+   * named.
+   */
+  public static Path defaultModule() {
+    String named = System.getProperty(MODULE_PROPERTY);
+    return named == null ? INSTALLED_MODULE : Path.of(named);
+  }
 
   private final Pkcs11SignatureToken token;
   private final DSSPrivateKeyEntry key;
@@ -87,8 +100,43 @@ public final class CardSigner implements AutoCloseable {
       throw alreadyExplained;
     } catch (Exception failure) {
       closeQuietly(token);
-      throw new SigningFailedException("the card could not be opened for signing", failure);
+      throw new SigningFailedException(reason(module, failure), failure);
     }
+  }
+
+  /**
+   * What went wrong, said as the thing to do about it.
+   *
+   * <p>"The card could not be opened" is true of an empty reader, an
+   * older module, and a card that refused, and sends the holder to
+   * look in three different places.
+   */
+  private static String reason(Path module, Exception failure) {
+    String detail = chain(failure).toLowerCase(Locale.ROOT);
+    if (detail.contains("has 0 slots") || detail.contains("token not present")
+        || detail.contains("no such slot")) {
+      return "no card in the reader";
+    }
+    if (detail.contains("ckr_attribute_type_invalid")) {
+      return "the card module at " + module
+          + " is too old for this application: it does not publish CKA_EXTRACTABLE, "
+          + "which Java requires before it will open a private key";
+    }
+    if (detail.contains("ckr_pin_incorrect") || detail.contains("pin")) {
+      return "the card refused the PIN";
+    }
+    return "the card could not be opened through " + module + ": " + chain(failure);
+  }
+
+  /** Every message in the cause chain, which is where the reason hides. */
+  private static String chain(Throwable failure) {
+    StringBuilder text = new StringBuilder();
+    for (Throwable step = failure; step != null; step = step.getCause()) {
+      if (step.getMessage() != null) {
+        text.append(text.isEmpty() ? "" : "; ").append(step.getMessage());
+      }
+    }
+    return text.toString();
   }
 
   /** Signs one PDF into itself, as PAdES. One PIN 2. */
@@ -135,9 +183,22 @@ public final class CardSigner implements AutoCloseable {
     }
   }
 
-  /** The certificate this will sign with, for a caller to show first. */
+  /**
+   * Who the signature will name, as the certificate writes it.
+   *
+   * <p>The common name rather than the whole distinguished name: a
+   * window says who is signing, and the rest of the subject is for the
+   * diagnostic report.
+   */
   public String signerName() {
-    return key.getCertificate().getSubject().getPrettyPrintRFC2253();
+    String subject = key.getCertificate().getSubject().getPrettyPrintRFC2253();
+    for (String part : subject.split(",")) {
+      String field = part.trim();
+      if (field.startsWith("commonName=")) {
+        return field.substring("commonName=".length());
+      }
+    }
+    return subject;
   }
 
   private static void closeQuietly(Pkcs11SignatureToken token) {
