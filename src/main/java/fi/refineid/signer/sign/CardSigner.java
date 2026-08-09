@@ -11,7 +11,13 @@ import eu.europa.esig.dss.model.SignatureValue;
 import eu.europa.esig.dss.model.ToBeSigned;
 import eu.europa.esig.dss.pades.PAdESSignatureParameters;
 import eu.europa.esig.dss.pades.signature.PAdESService;
+import eu.europa.esig.dss.service.ocsp.OnlineOCSPSource;
 import eu.europa.esig.dss.service.tsp.OnlineTSPSource;
+import eu.europa.esig.dss.model.x509.CertificateToken;
+import eu.europa.esig.dss.model.x509.revocation.ocsp.OCSP;
+import eu.europa.esig.dss.spi.x509.aia.DefaultAIASource;
+import eu.europa.esig.dss.spi.x509.revocation.RevocationToken;
+import fi.refineid.signer.card.CredentialStatus;
 import eu.europa.esig.dss.spi.validation.CommonCertificateVerifier;
 import eu.europa.esig.dss.token.DSSPrivateKeyEntry;
 import eu.europa.esig.dss.token.PasswordInputCallback;
@@ -196,6 +202,68 @@ public final class CardSigner implements AutoCloseable {
     } catch (Exception failure) {
       throw new SigningFailedException("the container was not signed", failure);
     }
+  }
+
+  /**
+   * What the issuer says about this certificate, asked before a
+   * signature is made with it.
+   *
+   * <p>The issuer is asked over OCSP, at the address the certificate
+   * itself names. A refusal to answer is not a refusal to sign: the
+   * status is reported as unchecked, and the holder decides.
+   */
+  public CredentialStatus credentialStatus() {
+    CertificateToken certificate = key.getCertificate();
+    CertificateToken issuer = issuerOf(certificate);
+    if (issuer == null) {
+      return new CredentialStatus(
+          CredentialStatus.State.UNKNOWN, "the issuer's certificate is not on the card");
+    }
+    try {
+      RevocationToken<OCSP> answer =
+          new OnlineOCSPSource().getRevocationToken(certificate, issuer);
+      if (answer == null || answer.getStatus() == null) {
+        return new CredentialStatus(CredentialStatus.State.UNKNOWN, "the issuer did not answer");
+      }
+      if (answer.getStatus().isGood()) {
+        return new CredentialStatus(CredentialStatus.State.USABLE, "");
+      }
+      String reason = answer.getReason() == null ? "withdrawn" : answer.getReason().getShortName();
+      String when =
+          answer.getRevocationDate() == null ? "" : " on " + answer.getRevocationDate();
+      return new CredentialStatus(CredentialStatus.State.REVOKED, reason + when);
+    } catch (RuntimeException unreachable) {
+      return new CredentialStatus(
+          CredentialStatus.State.UNKNOWN, "the issuer could not be reached");
+    }
+  }
+
+  /**
+   * The issuer's certificate: from the chain the card carries, or from
+   * the address the certificate names when the card carries only its
+   * own.
+   *
+   * <p>A FINEID card publishes the holder's certificate and not the
+   * CA's, so asking the card alone finds nothing and the status can
+   * never be read. The certificate says where its issuer lives, which
+   * is what that extension is for.
+   */
+  private CertificateToken issuerOf(CertificateToken certificate) {
+    for (CertificateToken candidate : key.getCertificateChain()) {
+      if (!candidate.equals(certificate) && certificate.isSignedBy(candidate)) {
+        return candidate;
+      }
+    }
+    try {
+      for (CertificateToken fetched : new DefaultAIASource().getCertificatesByAIA(certificate)) {
+        if (certificate.isSignedBy(fetched)) {
+          return fetched;
+        }
+      }
+    } catch (RuntimeException unreachable) {
+      return null;
+    }
+    return null;
   }
 
   /**

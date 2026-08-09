@@ -6,6 +6,7 @@ import fi.refineid.signer.job.JobPlan;
 import fi.refineid.signer.job.JobShape;
 import fi.refineid.signer.job.PinPolicy;
 import fi.refineid.signer.job.SigningJob;
+import fi.refineid.signer.card.CredentialStatus;
 import fi.refineid.signer.sign.CardSigner;
 import fi.refineid.signer.sign.SigningFailedException;
 import java.io.File;
@@ -17,9 +18,13 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.input.TransferMode;
@@ -47,9 +52,19 @@ public final class SignerApp extends Application {
   private final ListView<String> results = new ListView<>();
   private final Label plan = new Label();
   private final Label signer = new Label("No card read yet");
+  private final Label credential = new Label();
   private final ToggleGroup shapes = new ToggleGroup();
   private final Button sign = new Button("Sign…");
+  private final MenuBar menus = new MenuBar();
   private volatile boolean cancelled;
+
+  /**
+   * Whether the card's certificate is worth signing with.
+   *
+   * <p>Read once with the card and remembered, because it decides
+   * whether Sign does anything at all.
+   */
+  private volatile boolean credentialUsable = true;
 
   public static void main(String[] arguments) {
     launch(arguments);
@@ -77,8 +92,10 @@ public final class SignerApp extends Application {
     choose.setOnAction(event -> chooseFiles(stage));
 
     VBox layout = new VBox(12,
+        menus(),
         title(),
         signer,
+        credential,
         drop,
         new Label("Documents"),
         chosen,
@@ -96,18 +113,49 @@ public final class SignerApp extends Application {
     stage.setTitle("ReFineID Signer");
     stage.setScene(new Scene(layout, 620, 720));
     stage.show();
+    // After the window is showing, not before: asked earlier, the
+    // menus were measured drawn inside the window, which is not where
+    // a Mac keeps them.
+    Platform.runLater(() -> menus.setUseSystemMenuBar(true));
     readCard();
   }
 
-  /** The name, with the build under it: a report about a signature
-   * is worth little without knowing which build made it. */
-  private VBox title() {
-    Label name = new Label("ReFineID Signer");
-    name.setFont(Font.font(name.getFont().getFamily(), 22));
-    Label version = new Label(AppVersion.current());
-    version.setStyle("-fx-text-fill: -fx-accent;");
-    version.setFont(Font.font(version.getFont().getFamily(), 11));
-    return new VBox(2, name, version);
+  private Label title() {
+    Label label = new Label("ReFineID Signer");
+    label.setFont(Font.font(label.getFont().getFamily(), 22));
+    return label;
+  }
+
+  /**
+   * The menu bar, carrying what this build is.
+   *
+   * <p>A version does not belong under the title: nobody signing a
+   * document needs a build number, and everybody reporting a problem
+   * does. It goes where a version is looked for.
+   *
+   * <p>Drawn in the system bar rather than in the window, which is
+   * where a Mac keeps menus. The About item macOS puts in the
+   * application menu belongs to the bundle and cannot be filled from
+   * here, so this one is named in full and sits under Help.
+   */
+  private MenuBar menus() {
+    MenuItem about = new MenuItem("About ReFineID Signer");
+    about.setOnAction(event -> showAbout());
+    Menu help = new Menu("Help");
+    help.getItems().add(about);
+    menus.getMenus().add(help);
+    return menus;
+  }
+
+  /** What this build is, and what it is signing through. */
+  private void showAbout() {
+    Alert about = new Alert(Alert.AlertType.INFORMATION);
+    about.setTitle("About ReFineID Signer");
+    about.setHeaderText("ReFineID Signer " + AppVersion.current());
+    about.setContentText(
+        "Document signing with Finnish identity cards.\n\n"
+            + "Card module: " + CardSigner.defaultModule());
+    about.showAndWait();
   }
 
   /** The drop area, which takes several files at once. */
@@ -148,12 +196,21 @@ public final class SignerApp extends Application {
         .forEach(documents::add);
     chosen.getItems().setAll(documents.stream().map(path -> path.getFileName().toString())
         .toList());
-    sign.setDisable(documents.isEmpty());
+    sign.setDisable(documents.isEmpty() || !credentialUsable);
     refreshPlan();
   }
 
   /** Says what the job will cost, in prompts, before it is started. */
   private void refreshPlan() {
+    if (!credentialUsable) {
+      // A signature made with a withdrawn certificate is correct in
+      // every respect and validates nowhere. Saying what the job would
+      // cost would be describing work this app will not do.
+      plan.setText(
+          "This certificate has been revoked. A signature made with it can never be "
+              + "validated, so nothing will be signed.");
+      return;
+    }
     if (documents.isEmpty()) {
       plan.setText("");
       return;
@@ -185,6 +242,14 @@ public final class SignerApp extends Application {
       try (CardSigner card = CardSigner.open(CardSigner.defaultModule())) {
         String name = card.signerName();
         Platform.runLater(() -> signer.setText("Signing as " + name));
+        CredentialStatus status = card.credentialStatus();
+        credentialUsable = status.permitsSigning();
+        Platform.runLater(() -> {
+          credential.setText(status.sentence());
+          credential.setStyle(credentialUsable ? "" : "-fx-text-fill: -fx-accent;");
+          refreshPlan();
+          sign.setDisable(documents.isEmpty() || !credentialUsable);
+        });
       } catch (SigningFailedException unavailable) {
         Platform.runLater(() -> signer.setText(unavailable.getMessage()));
       }
