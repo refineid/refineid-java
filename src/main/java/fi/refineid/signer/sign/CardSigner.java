@@ -116,7 +116,7 @@ public final class CardSigner implements AutoCloseable {
       // CKR_SLOT_ID_INVALID. A negative slot id is how DSS is told to
       // use the index instead.
       PasswordInputCallback password = pin == null ? null : () -> pin;
-      token = new Pkcs11SignatureToken(module.toString(), password, -1, slotIndex(), null);
+      token = new Pkcs11SignatureToken(module.toString(), password, -1, slot(), null);
       return new CardSigner(token, signingKey(token.getKeys()));
     } catch (SigningFailedException alreadyExplained) {
       closeQuietly(token);
@@ -217,7 +217,7 @@ public final class CardSigner implements AutoCloseable {
   }
 
   /** The slot to open, first unless this run says otherwise. */
-  private static int slotIndex() {
+  public static int slot() {
     try {
       return Integer.parseInt(System.getProperty(SLOT_PROPERTY, "0"));
     } catch (NumberFormatException notANumber) {

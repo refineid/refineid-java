@@ -7,12 +7,14 @@ import fi.refineid.signer.job.JobShape;
 import fi.refineid.signer.job.PinPolicy;
 import fi.refineid.signer.job.SigningJob;
 import fi.refineid.signer.card.CredentialStatus;
+import fi.refineid.signer.card.TokenAuthentication;
 import fi.refineid.signer.sign.CardSigner;
 import fi.refineid.signer.sign.SigningFailedException;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -60,6 +62,12 @@ public final class SignerApp extends Application {
   private final Button sign = new Button("Sign…");
   private final MenuBar menus = new MenuBar();
   private volatile boolean cancelled;
+
+  /** True while a job is on the card, when nothing else may open it. */
+  private volatile boolean signing;
+
+  /** Who collects the PIN, asked of the token when the card is read. */
+  private volatile TokenAuthentication authentication = TokenAuthentication.TOKEN_COLLECTS;
 
   /**
    * Whether the card's certificate is worth signing with.
@@ -119,6 +127,14 @@ public final class SignerApp extends Application {
 
     stage.setTitle("ReFineID Signer");
     stage.setScene(new Scene(layout, 620, 720));
+    // Read again whenever the window comes forward. A card is put in
+    // after the application is already open, and a window that read
+    // once at startup says there is no card while it signs documents.
+    stage.focusedProperty().addListener((source, was, now) -> {
+      if (now && !signing) {
+        readCard();
+      }
+    });
     stage.show();
     // After the window is showing, not before: asked earlier, the
     // menus were measured drawn inside the window, which is not where
@@ -232,15 +248,15 @@ public final class SignerApp extends Application {
   }
 
   /**
-   * How PIN 2 will be collected on this run.
+   * How PIN 2 will be collected, as the token says.
    *
-   * <p>Asking once for a whole job needs the module started with
-   * textual PIN entry; otherwise the system dialog collects it and
-   * appears for every signature, and the window must not promise
-   * otherwise.
+   * <p>A token that collects its own credential decides how often a
+   * holder is asked, and this window must not promise otherwise. One
+   * that expects the caller to supply it can be given one entry for a
+   * whole job.
    */
   private PinPolicy pinPolicy() {
-    return "textual".equalsIgnoreCase(System.getenv("REFINEID_PKCS11_PIN_ENTRY"))
+    return authentication == TokenAuthentication.CALLER_SUPPLIES
         ? PinPolicy.ASK_ONCE_FOR_THE_JOB
         : PinPolicy.ASK_EACH_SIGNATURE;
   }
@@ -255,6 +271,7 @@ public final class SignerApp extends Application {
       try (CardSigner card = CardSigner.open(CardSigner.defaultModule())) {
         String name = card.signerName();
         Platform.runLater(() -> signer.setText("Signing as " + name));
+        authentication = TokenAuthentication.of(CardSigner.defaultModule(), CardSigner.slot());
         CredentialStatus status = card.credentialStatus();
         credentialUsable = status.permitsSigning();
         Platform.runLater(() -> {
@@ -278,12 +295,24 @@ public final class SignerApp extends Application {
    */
   private void signAll() {
     JobPlan job = new JobPlan(documents, selectedShape(), pinPolicy());
+    // Asked once, here, for the whole job: the card verifies PIN 2 per
+    // signature but does not require a person to answer per signature.
+    char[] pin = null;
+    if (job.pin() == PinPolicy.ASK_ONCE_FOR_THE_JOB) {
+      Optional<char[]> entered = new PinPrompt().ask(job.signatureCount());
+      if (entered.isEmpty()) {
+        return;
+      }
+      pin = entered.get();
+    }
+    char[] held = pin;
     results.getItems().clear();
     sign.setDisable(true);
     cancelled = false;
     Path destination = documents.getFirst().getParent();
+    signing = true;
     Thread.ofVirtual().start(() -> {
-      try (CardSigner card = CardSigner.open(CardSigner.defaultModule())) {
+      try (CardSigner card = CardSigner.open(CardSigner.defaultModule(), held)) {
         new SigningJob(card, destination).run(job, new SigningJob.Progress() {
           @Override
           public void starting(Path document, int number, int total) {
@@ -311,7 +340,15 @@ public final class SignerApp extends Application {
       } catch (SigningFailedException failure) {
         report(failure.getMessage());
       } finally {
-        Platform.runLater(() -> sign.setDisable(false));
+        if (held != null) {
+          // The job is over; the value goes with it.
+          java.util.Arrays.fill(held, '\0');
+        }
+        signing = false;
+        Platform.runLater(() -> {
+          sign.setDisable(false);
+          readCard();
+        });
       }
     });
   }
