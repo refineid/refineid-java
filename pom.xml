@@ -7,7 +7,7 @@
   <groupId>fi.refineid</groupId>
   <artifactId>refineid-signer</artifactId>
   <!-- YY.M.D, the release date, no zero padding. -->
-  <version>26.8.9</version>
+  <version>26.8.9.151</version>
   <packaging>jar</packaging>
 
   <name>ReFineID Signer</name>
@@ -107,6 +107,13 @@
           <mainClass>fi.refineid.signer.ui.SignerApp</mainClass>
           <options>
             <option>-Drefineid.module=${refineid.module}</option>
+            <!-- Without this macOS names the application after the
+                 process and the main class, so its menu reads "java"
+                 and "fi.refineid.signer.ui.SignerApp". One word: the
+                 plugin splits an option on spaces, and the tail of a
+                 two-word name arrives as the class to run. The
+                 packaged build takes its full name from the bundle. -->
+            <option>-Xdock:name=ReFineID</option>
           </options>
         </configuration>
       </plugin>
