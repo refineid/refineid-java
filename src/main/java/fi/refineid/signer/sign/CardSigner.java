@@ -18,6 +18,7 @@ import eu.europa.esig.dss.model.x509.CertificateToken;
 import eu.europa.esig.dss.model.x509.revocation.ocsp.OCSP;
 import eu.europa.esig.dss.spi.x509.aia.DefaultAIASource;
 import eu.europa.esig.dss.spi.x509.revocation.RevocationToken;
+import fi.refineid.signer.card.CardFailure;
 import fi.refineid.signer.card.CredentialStatus;
 import eu.europa.esig.dss.spi.validation.CommonCertificateVerifier;
 import eu.europa.esig.dss.token.DSSPrivateKeyEntry;
@@ -122,44 +123,10 @@ public final class CardSigner implements AutoCloseable {
       throw alreadyExplained;
     } catch (Exception failure) {
       closeQuietly(token);
-      throw new SigningFailedException(reason(module, failure), failure);
+      throw new SigningFailedException(CardFailure.from(failure).sentence(), failure);
     }
   }
 
-  /**
-   * What went wrong, said as the thing to do about it.
-   *
-   * <p>"The card could not be opened" is true of an empty reader, an
-   * older module, and a card that refused, and sends the holder to
-   * look in three different places.
-   */
-  private static String reason(Path module, Exception failure) {
-    String detail = chain(failure).toLowerCase(Locale.ROOT);
-    if (detail.contains("has 0 slots") || detail.contains("token not present")
-        || detail.contains("no such slot")) {
-      return "no card in the reader";
-    }
-    if (detail.contains("ckr_attribute_type_invalid")) {
-      return "the card module at " + module
-          + " is too old for this application: it does not publish CKA_EXTRACTABLE, "
-          + "which Java requires before it will open a private key";
-    }
-    if (detail.contains("ckr_pin_incorrect") || detail.contains("pin")) {
-      return "the card refused the PIN";
-    }
-    return "the card could not be opened through " + module + ": " + chain(failure);
-  }
-
-  /** Every message in the cause chain, which is where the reason hides. */
-  private static String chain(Throwable failure) {
-    StringBuilder text = new StringBuilder();
-    for (Throwable step = failure; step != null; step = step.getCause()) {
-      if (step.getMessage() != null) {
-        text.append(text.isEmpty() ? "" : "; ").append(step.getMessage());
-      }
-    }
-    return text.toString();
-  }
 
   /** Signs one PDF into itself, as PAdES. One PIN 2. */
   public void signPdf(Path document, Path output) throws SigningFailedException {

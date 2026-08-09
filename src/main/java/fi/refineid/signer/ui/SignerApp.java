@@ -53,6 +53,9 @@ public final class SignerApp extends Application {
   private final Label plan = new Label();
   private final Label signer = new Label("No card read yet");
   private final Label credential = new Label();
+
+  /** The drop area, disabled while there is nothing to sign with. */
+  private StackPane drop;
   private final ToggleGroup shapes = new ToggleGroup();
   private final Button sign = new Button("Sign…");
   private final MenuBar menus = new MenuBar();
@@ -81,8 +84,12 @@ public final class SignerApp extends Application {
     separately.setUserData(JobShape.EACH_DOCUMENT);
     shapes.selectedToggleProperty().addListener((source, was, now) -> refreshPlan());
 
-    StackPane drop = dropArea();
+    drop = dropArea();
     plan.setWrapText(true);
+    // Wrapped, not clipped: this line carries the reason a card cannot
+    // be used, and half a reason sends someone to the wrong place.
+    signer.setWrapText(true);
+    credential.setWrapText(true);
 
     sign.setDefaultButton(true);
     sign.setDisable(true);

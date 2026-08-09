@@ -32,9 +32,11 @@ cp "target/refineid-signer-${version}.jar" target/lib/
 # has already lost them. ssh needs the installed copy, because
 # ssh-agent only loads a provider from a small allowlist; nothing
 # loading a module by path does.
+# Into the input directory, which is what jpackage copies to $APPDIR.
+# --resource-dir is for jpackage's own templates and puts nothing in
+# the application.
 module_source="${REFINEID_MODULE_SOURCE:-/usr/local/lib/librefineid_pkcs11_sign.dylib}"
-mkdir -p target/module
-cp "$module_source" target/module/
+cp "$module_source" target/lib/
 
 rm -rf "target/dist"
 jpackage \
@@ -47,7 +49,6 @@ jpackage \
   --dest target/dist \
   --vendor "ReFineID" \
   --mac-package-identifier fi.refineid.signer \
-  --resource-dir target/module \
   --java-options "-Drefineid.module=\$APPDIR/librefineid_pkcs11_sign.dylib"
 
 # macOS takes at most three components in a version, and uses two
