@@ -139,11 +139,17 @@ public final class SignerApp extends Application {
    * here, so this one is named in full and sits under Help.
    */
   private MenuBar menus() {
+    MenuItem timestamps = new MenuItem("Timestamp Service…");
+    timestamps.setOnAction(event -> new TimestampDialog().show());
+    Menu signing = new Menu("Signing");
+    signing.getItems().add(timestamps);
+
     MenuItem about = new MenuItem("About ReFineID Signer");
     about.setOnAction(event -> showAbout());
     Menu help = new Menu("Help");
     help.getItems().add(about);
-    menus.getMenus().add(help);
+
+    menus.getMenus().addAll(signing, help);
     return menus;
   }
 

@@ -26,6 +26,16 @@ mvn -B -q clean package -DskipTests
 mvn -B -q dependency:copy-dependencies -DoutputDirectory=target/lib
 cp "target/refineid-signer-${version}.jar" target/lib/
 
+# The card module travels inside the bundle. Installed in
+# /usr/local/lib it needs an administrator, and an application that
+# asks a person for their admin password before it will sign anything
+# has already lost them. ssh needs the installed copy, because
+# ssh-agent only loads a provider from a small allowlist; nothing
+# loading a module by path does.
+module_source="${REFINEID_MODULE_SOURCE:-/usr/local/lib/librefineid_pkcs11_sign.dylib}"
+mkdir -p target/module
+cp "$module_source" target/module/
+
 rm -rf "target/dist"
 jpackage \
   --type app-image \
@@ -36,7 +46,9 @@ jpackage \
   --main-class "$main_class" \
   --dest target/dist \
   --vendor "ReFineID" \
-  --mac-package-identifier fi.refineid.signer
+  --mac-package-identifier fi.refineid.signer \
+  --resource-dir target/module \
+  --java-options "-Drefineid.module=\$APPDIR/librefineid_pkcs11_sign.dylib"
 
 # macOS takes at most three components in a version, and uses two
 # fields for two jobs: the one a person reads, and the one builds are

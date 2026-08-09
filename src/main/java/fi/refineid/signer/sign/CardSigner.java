@@ -12,6 +12,7 @@ import eu.europa.esig.dss.model.ToBeSigned;
 import eu.europa.esig.dss.pades.PAdESSignatureParameters;
 import eu.europa.esig.dss.pades.signature.PAdESService;
 import eu.europa.esig.dss.service.ocsp.OnlineOCSPSource;
+import eu.europa.esig.dss.service.http.commons.TimestampDataLoader;
 import eu.europa.esig.dss.service.tsp.OnlineTSPSource;
 import eu.europa.esig.dss.model.x509.CertificateToken;
 import eu.europa.esig.dss.model.x509.revocation.ocsp.OCSP;
@@ -36,18 +37,6 @@ import java.util.List;
  * this twelve times and the holder answers twelve times.
  */
 public final class CardSigner implements AutoCloseable {
-
-  /**
-   * The timestamp authority a signature is stamped by, the same one
-   * the rest of ReFineID uses.
-   *
-   * <p>Without a timestamp a signature carries only the time the
-   * signing computer claimed, which no one has to believe, and a
-   * validator says so: DVV reports such a signature as not validated
-   * by a time stamp authority. The stamp is what fixes the signature
-   * in time independently of this machine.
-   */
-  public static final String TIMESTAMP_AUTHORITY = "http://timestamp.sectigo.com/qualified";
 
   /** Where the signing module is installed on macOS. */
   public static final Path INSTALLED_MODULE =
@@ -169,7 +158,7 @@ public final class CardSigner implements AutoCloseable {
       parameters.setCertificateChain(key.getCertificateChain());
 
       PAdESService service = new PAdESService(new CommonCertificateVerifier());
-      service.setTspSource(new OnlineTSPSource(TIMESTAMP_AUTHORITY));
+      service.setTspSource(timestamps());
       ToBeSigned dataToSign = service.getDataToSign(toSign, parameters);
       SignatureValue signature = token.sign(dataToSign, parameters.getDigestAlgorithm(), key);
       service.signDocument(toSign, parameters, signature).save(output.toString());
@@ -195,13 +184,35 @@ public final class CardSigner implements AutoCloseable {
       parameters.setCertificateChain(key.getCertificateChain());
 
       ASiCWithXAdESService service = new ASiCWithXAdESService(new CommonCertificateVerifier());
-      service.setTspSource(new OnlineTSPSource(TIMESTAMP_AUTHORITY));
+      service.setTspSource(timestamps());
       ToBeSigned dataToSign = service.getDataToSign(toSign, parameters);
       SignatureValue signature = token.sign(dataToSign, parameters.getDigestAlgorithm(), key);
       service.signDocument(toSign, parameters, signature).save(output.toString());
     } catch (Exception failure) {
       throw new SigningFailedException("the container was not signed", failure);
     }
+  }
+
+  /**
+   * The authority a signature is stamped by, as this machine is set.
+   *
+   * <p>Without a timestamp a signature carries only the time this
+   * computer claimed, which nobody has to believe and a validator
+   * reports as unvalidated. Credentials are attached only when the
+   * setting carries them, which is the case for an authority an
+   * organization pays for rather than the shared qualified one.
+   */
+  private static OnlineTSPSource timestamps() {
+    TimestampSettings settings = TimestampSettings.stored();
+    OnlineTSPSource source = new OnlineTSPSource(settings.address());
+    if (settings.hasCredentials()) {
+      TimestampDataLoader loader = new TimestampDataLoader();
+      loader.addAuthentication(
+          settings.host(), settings.port(), "", settings.username(),
+          settings.password().toCharArray());
+      source.setDataLoader(loader);
+    }
+    return source;
   }
 
   /**
