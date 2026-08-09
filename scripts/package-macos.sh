@@ -38,4 +38,14 @@ jpackage \
   --vendor "ReFineID" \
   --mac-package-identifier fi.refineid.signer
 
-echo "built target/dist/${name}.app"
+# macOS takes at most three components in a version, and uses two
+# fields for two jobs: the one a person reads, and the one builds are
+# ordered by. The bucket is the second, exactly as the Apple build
+# does it.
+bucket="$(echo "$version" | cut -d. -f4)"
+if [ -n "$bucket" ]; then
+  /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${bucket}" \
+    "target/dist/${name}.app/Contents/Info.plist"
+fi
+
+echo "built target/dist/${name}.app (${bundle_version}, build ${bucket:-none})"

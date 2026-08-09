@@ -1,5 +1,6 @@
 package fi.refineid.signer.ui;
 
+import fi.refineid.signer.AppVersion;
 import fi.refineid.signer.job.DocumentOutcome;
 import fi.refineid.signer.job.JobPlan;
 import fi.refineid.signer.job.JobShape;
@@ -98,10 +99,15 @@ public final class SignerApp extends Application {
     readCard();
   }
 
-  private Label title() {
-    Label label = new Label("ReFineID Signer");
-    label.setFont(Font.font(label.getFont().getFamily(), 22));
-    return label;
+  /** The name, with the build under it: a report about a signature
+   * is worth little without knowing which build made it. */
+  private VBox title() {
+    Label name = new Label("ReFineID Signer");
+    name.setFont(Font.font(name.getFont().getFamily(), 22));
+    Label version = new Label(AppVersion.current());
+    version.setStyle("-fx-text-fill: -fx-accent;");
+    version.setFont(Font.font(version.getFont().getFamily(), 11));
+    return new VBox(2, name, version);
   }
 
   /** The drop area, which takes several files at once. */
