@@ -46,6 +46,25 @@ public final class CardSigner implements AutoCloseable {
   public static final String MODULE_PROPERTY = "refineid.module";
 
   /**
+   * Which slot of that module to open, counted along the module's own
+   * list.
+   *
+   * <p>Modules disagree about what a slot is. The ReFineID module
+   * publishes one per identity and keeps the signing key in a module
+   * of its own, so the first slot is the right one. Atostek's module
+   * publishes two, labelled for PIN 1 and PIN 2, and the signing key
+   * is behind the second. An application that is not tied to one
+   * vendor cannot assume either.
+   */
+  public static final String SLOT_PROPERTY = "refineid.slot";
+
+  /**
+   * Which cryptosystem to sign with when the card carries more than
+   * one signing key, as this one does.
+   */
+  public static final String KEY_PROPERTY = "refineid.key";
+
+  /**
    * The module this run will use: the installed one unless another was
    * named.
    */
@@ -96,13 +115,8 @@ public final class CardSigner implements AutoCloseable {
       // CKR_SLOT_ID_INVALID. A negative slot id is how DSS is told to
       // use the index instead.
       PasswordInputCallback password = pin == null ? null : () -> pin;
-      token = new Pkcs11SignatureToken(module.toString(), password, -1, 0, null);
-      List<DSSPrivateKeyEntry> keys = token.getKeys();
-      if (keys.size() != 1) {
-        throw new SigningFailedException(
-            "expected one signing key on the card, found " + keys.size());
-      }
-      return new CardSigner(token, keys.getFirst());
+      token = new Pkcs11SignatureToken(module.toString(), password, -1, slotIndex(), null);
+      return new CardSigner(token, signingKey(token.getKeys()));
     } catch (SigningFailedException alreadyExplained) {
       closeQuietly(token);
       throw alreadyExplained;
@@ -190,6 +204,57 @@ public final class CardSigner implements AutoCloseable {
       service.signDocument(toSign, parameters, signature).save(output.toString());
     } catch (Exception failure) {
       throw new SigningFailedException("the container was not signed", failure);
+    }
+  }
+
+  /**
+   * The key a document is signed with, chosen from what the slot
+   * offers.
+   *
+   * <p>Only a key whose certificate carries non-repudiation may sign a
+   * document: that bit is what separates a signing credential from the
+   * one used to log in, and choosing wrongly signs a contract with a
+   * login key.
+   *
+   * <p>A card may carry more than one such key. This one carries two,
+   * an elliptic-curve and an RSA certificate for the same person, and
+   * both are legitimate. The curve is preferred because it is the
+   * current enrollment on these cards, and the choice is reported so
+   * the holder can see which signed.
+   */
+  private static DSSPrivateKeyEntry signingKey(List<DSSPrivateKeyEntry> offered)
+      throws SigningFailedException {
+    List<DSSPrivateKeyEntry> committing = offered.stream()
+        .filter(CardSigner::commitsContent)
+        .toList();
+    if (committing.isEmpty()) {
+      throw new SigningFailedException(
+          offered.isEmpty()
+              ? "the card offered no keys"
+              : "the card offered no key that may sign a document; "
+                  + offered.size() + " key(s) are for other uses");
+    }
+    String preferred = System.getProperty(KEY_PROPERTY, "EC");
+    return committing.stream()
+        .filter(key -> preferred.equals(key.getCertificate().getPublicKey().getAlgorithm()))
+        .findFirst()
+        .orElse(committing.getFirst());
+  }
+
+  /** Whether this certificate may commit its holder to a document. */
+  private static boolean commitsContent(DSSPrivateKeyEntry key) {
+    boolean[] usage = key.getCertificate().getCertificate().getKeyUsage();
+    // Bit 1 of the key-usage extension: non-repudiation, which X.509
+    // now calls content commitment.
+    return usage != null && usage.length > 1 && usage[1];
+  }
+
+  /** The slot to open, first unless this run says otherwise. */
+  private static int slotIndex() {
+    try {
+      return Integer.parseInt(System.getProperty(SLOT_PROPERTY, "0"));
+    } catch (NumberFormatException notANumber) {
+      return 0;
     }
   }
 
@@ -284,6 +349,11 @@ public final class CardSigner implements AutoCloseable {
    * window says who is signing, and the rest of the subject is for the
    * diagnostic report.
    */
+  /** Which cryptosystem the chosen key uses, for a report to name. */
+  public String keyAlgorithm() {
+    return key.getCertificate().getPublicKey().getAlgorithm();
+  }
+
   public String signerName() {
     String subject = key.getCertificate().getSubject().getPrettyPrintRFC2253();
     for (String part : subject.split(",")) {

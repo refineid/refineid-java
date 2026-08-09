@@ -186,6 +186,13 @@
                   <mainClass>fi.refineid.signer.ui.Launcher</mainClass>
                   <manifestEntries>
                     <Implementation-Version>${project.version}</Implementation-Version>
+                    <!-- Kept, because shading drops it and the library
+                         that reaches the card is a multi-release jar:
+                         without this the JVM loads its Java 8 code,
+                         which cannot open a PKCS#11 provider at all
+                         and says so as "JDK < 9". Measured: the jar
+                         built without this could not sign. -->
+                    <Multi-Release>true</Multi-Release>
                   </manifestEntries>
                 </transformer>
                 <transformer

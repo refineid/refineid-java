@@ -39,6 +39,12 @@ public final class CardKeystore implements AutoCloseable {
    * publishes the authentication key as well, which is for logging in
    * to things and must not be used to sign a document.
    */
+  /** Names a module somewhere else, for a build under test. */
+  public static final String MODULE_PROPERTY = "refineid.module";
+
+  /** Which slot of that module to open; see CardSigner for why. */
+  public static final String SLOT_PROPERTY = "refineid.slot";
+
   private static final List<Path> MODULE_SEARCH_PATH = List.of(
       Path.of("/usr/local/lib/librefineid_pkcs11_sign.dylib"),
       Path.of("/usr/local/lib/librefineid_pkcs11.dylib"));
@@ -58,6 +64,14 @@ public final class CardKeystore implements AutoCloseable {
    *     the one that is cannot be configured or opened
    */
   public static CardKeystore open() throws CardUnavailableException {
+    // A module named on the command line wins: this is how a build
+    // under test, or another vendor's module entirely, is pointed at
+    // without editing a search path. The application is not tied to
+    // one implementation of PKCS#11 and this is where that shows.
+    String named = System.getProperty(MODULE_PROPERTY);
+    if (named != null && !named.isBlank()) {
+      return open(Path.of(named));
+    }
     Path module = MODULE_SEARCH_PATH.stream()
         .filter(Files::isReadable)
         .findFirst()
@@ -131,7 +145,7 @@ public final class CardKeystore implements AutoCloseable {
     return String.join(System.lineSeparator(),
         "name = ReFineID",
         "library = " + module,
-        "slotListIndex = 0");
+        "slotListIndex = " + System.getProperty(SLOT_PROPERTY, "0"));
   }
 
   /** Every alias the card publishes. */
