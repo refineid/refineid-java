@@ -71,6 +71,29 @@ application there. Linux offers no such service at all, and PKCS#11 is
 the mechanism. So the module is a macOS and Linux need, not a
 cross-platform one.
 
+## What a module may declare that a card cannot honour
+
+A PKCS#11 module tells consumers, per mechanism, the key sizes it
+supports. `SunPKCS11` enforces that declaration verbatim: the JDK reads
+`iMinKeySize` and `iMaxKeySize` straight from `C_GetMechanismInfo` and
+refuses any key outside the range, with `InvalidKeyException`. There is
+no policy file, system property or provider option that overrides it,
+and the JCE unlimited-strength policy files people remember have not
+existed since Java 9.
+
+Measured against a module that declares `2048..2048` for every signing
+mechanism, elliptic-curve mechanisms included: a 384-bit curve key is
+refused as too small and a 3072-bit RSA key as too large, on a card
+that holds both and signs with either. The declaration cannot be right
+for both, and no Java-side setting rescues it.
+
+Two things follow. A module ReFineID ships must declare per-mechanism
+limits that match what the card holds, or every SunPKCS11 consumer on
+that machine loses signing. And the provider-agnostic promise of
+ADR-0002 has a boundary worth naming: this application works with any
+module that describes itself correctly, which is not the same as any
+module.
+
 ## Consequences
 
 - The CTK extension remains the only code touching the card on Apple
