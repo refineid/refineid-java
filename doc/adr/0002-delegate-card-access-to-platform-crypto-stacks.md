@@ -12,10 +12,10 @@ The ReFineID project already maintains one smartcard protocol
 implementation per platform, each proven against real FINEID hardware:
 
 - a CryptoTokenKit token extension on Apple platforms
-  ([ReFineID-Apple](https://github.com/ReFineID/ReFineID-Apple)),
+  ([ReFineID-Apple](https://github.com/refineid/refineid-apple)),
 - a smart card minidriver on Windows,
 - a PKCS#11 v2.40 module (read-only, sign-only) on Linux and BSD
-  ([ReFineID-Unix](https://github.com/ReFineID/ReFineID-Unix)).
+  ([ReFineID-Unix](https://github.com/refineid/refineid-unix)).
 
 A Java application could talk to the card directly through
 `javax.smartcardio`, but that would create yet another implementation

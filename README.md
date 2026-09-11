@@ -8,10 +8,10 @@ timestamps and EU trusted-list handling, built on
 The application contains no smartcard-protocol code. Card access is
 delegated through the Java Cryptography Architecture to the platform's
 ReFineID card stack: the PKCS#11 module from
-[ReFineID-Unix](https://github.com/ReFineID/ReFineID-Unix) on Linux
+[ReFineID-Unix](https://github.com/refineid/refineid-unix) on Linux
 and BSD, the ReFineID minidriver via MSCAPI on Windows, and a
 PKCS#11-over-CryptoTokenKit bridge from
-[ReFineID-Apple](https://github.com/ReFineID/ReFineID-Apple) on macOS.
+[ReFineID-Apple](https://github.com/refineid/refineid-apple) on macOS.
 
 Architecture decisions are recorded as ADRs in [doc/adr/](doc/adr/).
 Start there; ADR-0002 is the load-bearing one.
