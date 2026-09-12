@@ -10,7 +10,7 @@
   <version>26.8.9.151</version>
   <packaging>jar</packaging>
 
-  <name>ReFineID Signer</name>
+  <name>RefineID Signer</name>
   <description>
     Document signing with Finnish identity cards. Contains no
     smartcard-protocol code: the card is reached through the Java
@@ -227,7 +227,7 @@
                  plugin splits an option on spaces, and the tail of a
                  two-word name arrives as the class to run. The
                  packaged build takes its full name from the bundle. -->
-            <option>-Xdock:name=ReFineID</option>
+            <option>-Xdock:name=RefineID</option>
           </options>
         </configuration>
       </plugin>

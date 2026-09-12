@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-ReFineID-Java starts as an empty repository, but its architecture was
+RefineID-Java starts as an empty repository, but its architecture was
 settled through design discussion before any code was written. Those
 decisions and their rationale need to live with the code, in a form
 that survives contributor turnover.

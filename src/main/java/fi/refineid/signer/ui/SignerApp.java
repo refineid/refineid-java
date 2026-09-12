@@ -125,7 +125,7 @@ public final class SignerApp extends Application {
     VBox.setVgrow(chosen, Priority.ALWAYS);
     VBox.setVgrow(results, Priority.ALWAYS);
 
-    stage.setTitle("ReFineID Signer");
+    stage.setTitle("RefineID Signer");
     stage.setScene(new Scene(layout, 620, 720));
     // Read again whenever the window comes forward. A card is put in
     // after the application is already open, and a window that read
@@ -144,7 +144,7 @@ public final class SignerApp extends Application {
   }
 
   private Label title() {
-    Label label = new Label("ReFineID Signer");
+    Label label = new Label("RefineID Signer");
     label.setFont(Font.font(label.getFont().getFamily(), 22));
     return label;
   }
@@ -167,7 +167,7 @@ public final class SignerApp extends Application {
     Menu signing = new Menu("Signing");
     signing.getItems().add(timestamps);
 
-    MenuItem about = new MenuItem("About ReFineID Signer");
+    MenuItem about = new MenuItem("About RefineID Signer");
     about.setOnAction(event -> showAbout());
     Menu help = new Menu("Help");
     help.getItems().add(about);
@@ -179,8 +179,8 @@ public final class SignerApp extends Application {
   /** What this build is, and what it is signing through. */
   private void showAbout() {
     Alert about = new Alert(Alert.AlertType.INFORMATION);
-    about.setTitle("About ReFineID Signer");
-    about.setHeaderText("ReFineID Signer " + AppVersion.current());
+    about.setTitle("About RefineID Signer");
+    about.setHeaderText("RefineID Signer " + AppVersion.current());
     about.setContentText(
         "Document signing with Finnish identity cards.\n\n"
             + "Card module: " + CardSigner.defaultModule());

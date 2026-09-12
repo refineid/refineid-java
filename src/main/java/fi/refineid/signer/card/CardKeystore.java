@@ -17,7 +17,7 @@ import java.util.List;
  * <p>This is the whole of this application's card access. There is no
  * APDU here and there will not be one: the platform card stack owns
  * the protocol, and the JCA is the seam (ADR-0002). On macOS that
- * stack is reached through the PKCS#11 module built in ReFineID-Apple
+ * stack is reached through the PKCS#11 module built in RefineID-Apple
  * (ADR-0004).
  *
  * <p>No PIN is passed from Java. The module advertises
@@ -76,7 +76,7 @@ public final class CardKeystore implements AutoCloseable {
         .filter(Files::isReadable)
         .findFirst()
         .orElseThrow(() -> new CardUnavailableException(
-            "no ReFineID PKCS#11 module is installed; looked in "
+            "no RefineID PKCS#11 module is installed; looked in "
                 + MODULE_SEARCH_PATH));
     return open(module);
   }
@@ -143,7 +143,7 @@ public final class CardKeystore implements AutoCloseable {
    */
   private static String pkcs11Configuration(Path module) {
     return String.join(System.lineSeparator(),
-        "name = ReFineID",
+        "name = RefineID",
         "library = " + module,
         "slotListIndex = " + System.getProperty(SLOT_PROPERTY, "0"));
   }

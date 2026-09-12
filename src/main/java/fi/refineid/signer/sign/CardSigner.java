@@ -50,7 +50,7 @@ public final class CardSigner implements AutoCloseable {
    * Which slot of that module to open, counted along the module's own
    * list.
    *
-   * <p>Modules disagree about what a slot is. The ReFineID module
+   * <p>Modules disagree about what a slot is. The RefineID module
    * publishes one per identity and keeps the signing key in a module
    * of its own, so the first slot is the right one. Atostek's module
    * publishes two, labelled for PIN 1 and PIN 2, and the signing key

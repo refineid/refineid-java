@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Build ReFineID Signer.app for this Mac.
+# Build RefineID Signer.app for this Mac.
 #
 # The application menu, the Dock tile and the About box take their name
 # from the bundle, which is why a development run shows "java" and this
@@ -13,7 +13,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-name="ReFineID Signer"
+name="RefineID Signer"
 main_class="fi.refineid.signer.ui.Launcher"
 
 version="$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout 2>/dev/null ||
@@ -47,7 +47,7 @@ jpackage \
   --main-jar "refineid-signer-${version}.jar" \
   --main-class "$main_class" \
   --dest target/dist \
-  --vendor "ReFineID" \
+  --vendor "RefineID" \
   --mac-package-identifier fi.refineid.signer \
   --java-options "-Drefineid.module=\$APPDIR/librefineid_pkcs11_sign.dylib"
 

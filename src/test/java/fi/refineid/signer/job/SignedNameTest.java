@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
  * The name a signed document carries.
  *
  * <p>Held by a test because it is shared: a signed file made here has
- * to look like one made by the other ReFineID applications, and a
+ * to look like one made by the other RefineID applications, and a
  * colon in it would not survive every file system it may cross.
  */
 class SignedNameTest {
@@ -20,7 +20,7 @@ class SignedNameTest {
 
   @Test
   @DisplayName("the original name, the UTC instant, and the format's extension")
-  void namesLikeTheRestOfReFineID() {
+  void namesLikeTheRestOfRefineID() {
     assertEquals("contract - signed at 2026-08-09T12-34-56Z.pdf",
         SignedName.name(Path.of("/tmp/contract.pdf"), NOON, "pdf"));
   }

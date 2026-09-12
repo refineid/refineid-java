@@ -13,7 +13,7 @@
 #              version that means different instants in different
 #              places is not a version.
 #
-# The same scheme every ReFineID project uses; Apple splits it into two
+# The same scheme every RefineID project uses; Apple splits it into two
 # settings because Apple wants two numbers, and Maven takes one string,
 # so here the bucket is the fourth component.
 #
