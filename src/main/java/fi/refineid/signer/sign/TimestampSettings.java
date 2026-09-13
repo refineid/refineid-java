@@ -8,7 +8,7 @@ import java.util.prefs.Preferences;
  *
  * <p>A signature without a timestamp carries only the time the signing
  * computer claimed. The default is the qualified authority every
- * ReFineID client shares, and it needs no credentials; an organization
+ * RefineID client shares, and it needs no credentials; an organization
  * running its own, or paying for one, is the reason this is
  * configurable at all, and those are the ones that ask for a user name
  * and a password.
@@ -23,7 +23,7 @@ import java.util.prefs.Preferences;
  */
 public record TimestampSettings(String address, String username, String password) {
 
-  /** The qualified authority every ReFineID client shares. */
+  /** The qualified authority every RefineID client shares. */
   public static final String DEFAULT_ADDRESS = "http://timestamp.sectigo.com/qualified";
 
   private static final String ADDRESS_KEY = "timestamp.address";

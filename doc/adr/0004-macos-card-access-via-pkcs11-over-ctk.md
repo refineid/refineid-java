@@ -14,23 +14,23 @@ gap: the JDK has no provider that reaches CryptoTokenKit (CTK) tokens
 
 Two options exist to reach the card from Java on macOS:
 
-1. Build the ReFineID-Unix PC/SC-based PKCS#11 module for macOS. This
+1. Build the RefineID-Unix PC/SC-based PKCS#11 module for macOS. This
    creates a second card stack on the platform and contends with the
    system token daemon for the card — the classic macOS smartcard
    conflict (as seen with OpenSC alongside CTK drivers).
 2. A PKCS#11 module implemented *on top of* CTK / Security.framework:
    it enumerates token-backed identities via `SecItemCopyMatching` and
    signs via `SecKeyCreateSignature`, so the system token daemon and
-   the ReFineID CTK extension do all card communication. Prior art:
+   the RefineID CTK extension do all card communication. Prior art:
    [keychain-pkcs11](https://github.com/kenh/keychain-pkcs11).
 
 Security.framework exposes token keys as read-and-sign only, which
-matches the PKCS#11 v2.40 read-only, sign-only profile ReFineID
+matches the PKCS#11 v2.40 read-only, sign-only profile RefineID
 already ships on Linux.
 
 Apple itself ships a minimal CTK-to-PKCS#11 bridge for ssh,
 `/usr/lib/ssh-keychain.dylib`. Tested 2026-08-07 against real
-hardware: with a 2026-generation FINEID card matched by the ReFineID
+hardware: with a 2026-generation FINEID card matched by the RefineID
 token extension, the token published exactly two identities, both EC
 P-384, and `ssh-keygen -D /usr/lib/ssh-keychain.dylib` failed with
 "provider returned no slots" — the bridge handles RSA identities only.
@@ -42,7 +42,7 @@ serve NSS/Firefox or `SunPKCS11` in any case.
 ## Decision
 
 macOS card access goes through a PKCS#11-over-CTK bridge module,
-implemented and maintained in the ReFineID-Apple repository (Swift
+implemented and maintained in the RefineID-Apple repository (Swift
 behind a C `C_GetFunctionList` entry surface), loaded by `SunPKCS11`
 like any other PKCS#11 module.
 
@@ -87,7 +87,7 @@ refused as too small and a 3072-bit RSA key as too large, on a card
 that holds both and signs with either. The declaration cannot be right
 for both, and no Java-side setting rescues it.
 
-Two things follow. A module ReFineID ships must declare per-mechanism
+Two things follow. A module RefineID ships must declare per-mechanism
 limits that match what the card holds, or every SunPKCS11 consumer on
 that machine loses signing. And the provider-agnostic promise of
 ADR-0002 has a boundary worth naming: this application works with any
@@ -113,7 +113,7 @@ module.
 - `ssh-agent` restricts PKCS#11 providers to an allowlist (by default
   `/usr/lib*` and `/usr/local/lib*`); the module's install location or
   documented `ssh-agent -P` override must account for this.
-- macOS support in ReFineID-Java is blocked on that module shipping;
+- macOS support in RefineID-Java is blocked on that module shipping;
   it does not exist yet. Until then the application runs on Linux and
   Windows only.
 - Integration risk to retire early: `SunPKCS11` and DSS must be tested
@@ -125,7 +125,7 @@ module.
   browsers) and withholds identities whose certificate declares
   contentCommitment (nonRepudiation), so the legally weighty
   qualified-signature key is never ambient in every PKCS#11-loading
-  process or PIN-cached by an ssh-agent. ReFineID-Java's `SunPKCS11`
+  process or PIN-cached by an ssh-agent. RefineID-Java's `SunPKCS11`
   configuration on macOS points at `librefineid_pkcs11_sign.dylib`,
   which exposes only the qualified-signature identity -- the signing
   key picker cannot offer the wrong key.

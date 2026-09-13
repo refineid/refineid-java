@@ -8,14 +8,14 @@ Accepted
 
 ## Context
 
-The ReFineID project already maintains one smartcard protocol
+The RefineID project already maintains one smartcard protocol
 implementation per platform, each proven against real FINEID hardware:
 
 - a CryptoTokenKit token extension on Apple platforms
-  ([ReFineID-Apple](https://github.com/refineid/refineid-apple)),
+  ([RefineID-Apple](https://github.com/refineid/refineid-apple)),
 - a smart card minidriver on Windows,
 - a PKCS#11 v2.40 module (read-only, sign-only) on Linux and BSD
-  ([ReFineID-Unix](https://github.com/refineid/refineid-unix)).
+  ([RefineID-Unix](https://github.com/refineid/refineid-unix)).
 
 A Java application could talk to the card directly through
 `javax.smartcardio`, but that would create yet another implementation
@@ -35,7 +35,7 @@ with pluggable providers.
 
 ## Decision
 
-ReFineID-Java contains no card-protocol code. It never opens a card
+RefineID-Java contains no card-protocol code. It never opens a card
 channel, never sends an APDU, and does not use `javax.smartcardio`.
 
 All key discovery and signing goes through the JCA `KeyStore` /
@@ -43,8 +43,8 @@ All key discovery and signing goes through the JCA `KeyStore` /
 
 | Platform | JCA provider | Card stack underneath |
 | --- | --- | --- |
-| Linux, BSD | `SunPKCS11` | `librefineid_pkcs11.so` from ReFineID-Unix |
-| Windows | `SunMSCAPI` (`Windows-MY`) | ReFineID minidriver |
+| Linux, BSD | `SunPKCS11` | `librefineid_pkcs11.so` from RefineID-Unix |
+| Windows | `SunMSCAPI` (`Windows-MY`) | RefineID minidriver |
 | macOS | `SunPKCS11` | PKCS#11-over-CryptoTokenKit module, see ADR-0004 |
 
 PIN entry is delegated to the platform stack where possible: on

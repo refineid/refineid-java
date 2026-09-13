@@ -8,7 +8,7 @@ import java.time.format.DateTimeFormatter;
 /**
  * What a signed document is called.
  *
- * <p>The same name the rest of ReFineID gives it, so a signed file
+ * <p>The same name the rest of RefineID gives it, so a signed file
  * looks the same whichever application made it: the original name, the
  * instant it was signed, and the extension the format calls for.
  *

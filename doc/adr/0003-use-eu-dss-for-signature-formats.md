@@ -13,7 +13,7 @@ card signature: PAdES, CAdES, and ASiC-E envelope formats, RFC 3161
 timestamps, revocation checking, and signature validation against the
 EU/eIDAS trusted lists (LOTL/TL).
 
-The sibling ReFineID implementations built this from scratch. In the
+The sibling RefineID implementations built this from scratch. In the
 Java ecosystem it exists off the shelf: Digital Signature Services
 (DSS), maintained for the European Commission, is the reference
 implementation of the eIDAS signature formats and trusted-list
@@ -26,7 +26,7 @@ DSS also ships signature-token bindings that match ADR-0002 exactly:
 
 ## Decision
 
-ReFineID-Java uses EU DSS for signature creation (PAdES baseline
+RefineID-Java uses EU DSS for signature creation (PAdES baseline
 profiles, CAdES, ASiC-E), timestamping, revocation data collection,
 and validation including EU trusted-list handling, with Bouncy Castle
 as the crypto provider and Apache PDFBox as the PDF backend. Card
@@ -45,7 +45,7 @@ We do not re-implement any signature format, and we do not fork DSS.
   makes dependency and vulnerability tracking (and keeping up with DSS
   releases) an ongoing maintenance duty.
 - Signature and validation behavior may differ in detail from
-  ReFineID-Unix and ReFineID-Apple, which have their own
+  RefineID-Unix and RefineID-Apple, which have their own
   implementations. Cross-implementation test vectors are the guard.
 - Trusted-list downloads and timestamp authority calls require network
   access; offline behavior must be defined explicitly in the

@@ -51,7 +51,7 @@ public enum TokenAuthentication {
     try {
       provider = Security.getProvider("SunPKCS11").configure("--"
           + String.join(System.lineSeparator(),
-              "name = ReFineIDProbe",
+              "name = RefineIDProbe",
               "library = \"" + module + "\"",
               "slotListIndex = " + slot));
       KeyStore store = KeyStore.getInstance("PKCS11", provider);

@@ -14,7 +14,7 @@ rejected on that ground alone. On macOS the expected gesture is
 concrete: several files are dropped on the drop area at once.
 
 A signature is not a file operation, though, and the card decides how
-many it will make per authorization. The ReFineID card stack records
+many it will make per authorization. The RefineID card stack records
 the rule plainly: PIN 2 "is never cached, so one verification serves
 one signature" (`CardOperations+Signing.swift`). One PIN 2, one
 signature — that is the card's rule and not a policy this application
