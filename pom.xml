@@ -23,13 +23,13 @@
     <maven.compiler.release>21</maven.compiler.release>
     <!-- Held here rather than inline so an upgrade is one edit and the
          version a build used is visible in one place. -->
-    <dss.version>6.1</dss.version>
+    <dss.version>6.2</dss.version>
     <junit.version>5.11.3</junit.version>
     <javafx.version>21.0.5</javafx.version>
     <bouncycastle.version>1.86</bouncycastle.version>
-    <commons-lang3.version>3.18.0</commons-lang3.version>
-    <httpclient5.version>5.6.3</httpclient5.version>
-    <httpcore5.version>5.4.3</httpcore5.version>
+    <commons-lang3.version>3.20.0</commons-lang3.version>
+    <httpclient5.version>5.6.4</httpclient5.version>
+    <httpcore5.version>5.4.4</httpcore5.version>
     <!-- The card module the app loads. Override to run against a build
          under test: mvn javafx:run -Drefineid.module=/path/to/module -->
     <refineid.module>/usr/local/lib/librefineid_pkcs11_sign.dylib</refineid.module>
