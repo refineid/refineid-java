@@ -26,10 +26,54 @@
     <dss.version>6.1</dss.version>
     <junit.version>5.11.3</junit.version>
     <javafx.version>21.0.5</javafx.version>
+    <bouncycastle.version>1.86</bouncycastle.version>
+    <commons-lang3.version>3.18.0</commons-lang3.version>
+    <httpclient5.version>5.6.3</httpclient5.version>
+    <httpcore5.version>5.4.3</httpcore5.version>
     <!-- The card module the app loads. Override to run against a build
          under test: mvn javafx:run -Drefineid.module=/path/to/module -->
     <refineid.module>/usr/local/lib/librefineid_pkcs11_sign.dylib</refineid.module>
   </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-lang3</artifactId>
+        <version>${commons-lang3.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents.client5</groupId>
+        <artifactId>httpclient5</artifactId>
+        <version>${httpclient5.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents.core5</groupId>
+        <artifactId>httpcore5</artifactId>
+        <version>${httpcore5.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents.core5</groupId>
+        <artifactId>httpcore5-h2</artifactId>
+        <version>${httpcore5.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-jdk18on</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcpkix-jdk18on</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcutil-jdk18on</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <!-- Signature formats, validation, and trusted-list handling.
