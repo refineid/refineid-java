@@ -7,7 +7,7 @@
   <groupId>fi.refineid</groupId>
   <artifactId>refineid-signer</artifactId>
   <!-- YY.M.D, the release date, no zero padding. -->
-  <version>26.8.9.151</version>
+  <version>26.10.18.133</version>
   <packaging>jar</packaging>
 
   <name>RefineID Signer</name>
