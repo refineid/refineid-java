@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -69,6 +70,43 @@ class JobPlanTest {
     assertEquals(3, plan.signatureCount(), "the card still verifies before every signature");
     assertEquals(1, plan.pinEntries(), "but the holder types it once");
     assertTrue(plan.summary().contains("once"), plan.summary());
+  }
+
+  private static List<Path> documents(int count) {
+    return IntStream.rangeClosed(1, count).mapToObj(i -> Path.of("document-" + i + ".pdf")).toList();
+  }
+
+  @Test
+  @DisplayName("PIN 2 may be held for 25 signatures and not for 26")
+  void heldPinLimit() {
+    assertFalse(new JobPlan(documents(25), JobShape.EACH_DOCUMENT, PinPolicy.ASK_ONCE_FOR_THE_JOB)
+        .exceedsHeldPinLimit());
+    assertTrue(new JobPlan(documents(26), JobShape.EACH_DOCUMENT, PinPolicy.ASK_ONCE_FOR_THE_JOB)
+        .exceedsHeldPinLimit());
+  }
+
+  @Test
+  @DisplayName("the limit counts signatures, so a container of many documents is within it")
+  void containerIsWithinTheLimit() {
+    assertFalse(new JobPlan(documents(100), JobShape.ONE_CONTAINER, PinPolicy.ASK_ONCE_FOR_THE_JOB)
+        .exceedsHeldPinLimit());
+  }
+
+  @Test
+  @DisplayName("the limit does not apply when the token collects PIN 2 itself")
+  void tokenCollectedPinIsNotLimited() {
+    assertFalse(new JobPlan(documents(100), JobShape.EACH_DOCUMENT, PinPolicy.ASK_EACH_SIGNATURE)
+        .exceedsHeldPinLimit());
+  }
+
+  @Test
+  @DisplayName("a job over the limit says so, and says what the limit is")
+  void summaryNamesTheLimit() {
+    String summary =
+        new JobPlan(documents(26), JobShape.EACH_DOCUMENT, PinPolicy.ASK_ONCE_FOR_THE_JOB).summary();
+    assertTrue(summary.contains("25"), summary);
+    assertTrue(summary.contains("more than"), summary);
+    assertFalse(summary.contains("you will be asked"), summary);
   }
 
   @Test

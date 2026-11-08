@@ -39,8 +39,14 @@ The implementation already works this way as
   a system dialog asks for each signature and the application never sees
   the value. The token decides which of the two cases applies; the
   holder does not choose.
-- This decision is for a small batch of documents in one job. It sets no
-  number of documents.
+- One entry of PIN 2 may authorize at most 25 signatures. For documents
+  signed separately that is 25 documents in one job. A job that would
+  have the application hold PIN 2 for more is not started, and the
+  window says that the limit is 25 and that the holder can choose fewer
+  documents or one signed container. A container is one signature
+  however many documents it holds, and the limit does not apply when the
+  token collects PIN 2 itself, because the application then never holds
+  it.
 
 ## Consequences
 

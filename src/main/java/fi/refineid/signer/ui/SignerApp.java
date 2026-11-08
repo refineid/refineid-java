@@ -90,7 +90,12 @@ public final class SignerApp extends Application {
     RadioButton separately = new RadioButton("Each document signed separately");
     separately.setToggleGroup(shapes);
     separately.setUserData(JobShape.EACH_DOCUMENT);
-    shapes.selectedToggleProperty().addListener((source, was, now) -> refreshPlan());
+    shapes.selectedToggleProperty().addListener((source, was, now) -> {
+      refreshPlan();
+      if (!signing) {
+        sign.setDisable(!canSign());
+      }
+    });
 
     drop = dropArea();
     plan.setWrapText(true);
@@ -225,8 +230,8 @@ public final class SignerApp extends Application {
         .forEach(documents::add);
     chosen.getItems().setAll(documents.stream().map(path -> path.getFileName().toString())
         .toList());
-    sign.setDisable(documents.isEmpty() || !credentialUsable);
     refreshPlan();
+    sign.setDisable(!canSign());
   }
 
   /** Says what the job will cost, in prompts, before it is started. */
@@ -265,6 +270,13 @@ public final class SignerApp extends Application {
     return (JobShape) shapes.getSelectedToggle().getUserData();
   }
 
+  /** Whether there is a job this window is willing to start. */
+  private boolean canSign() {
+    return !documents.isEmpty()
+        && credentialUsable
+        && !new JobPlan(documents, selectedShape(), pinPolicy()).exceedsHeldPinLimit();
+  }
+
   /** Reads the card once at startup, so the window can name the signer. */
   private void readCard() {
     Thread.ofVirtual().start(() -> {
@@ -278,7 +290,7 @@ public final class SignerApp extends Application {
           credential.setText(status.sentence());
           credential.setStyle(credentialUsable ? "" : "-fx-text-fill: -fx-accent;");
           refreshPlan();
-          sign.setDisable(documents.isEmpty() || !credentialUsable);
+          sign.setDisable(!canSign());
         });
       } catch (SigningFailedException unavailable) {
         Platform.runLater(() -> signer.setText(unavailable.getMessage()));
@@ -295,6 +307,10 @@ public final class SignerApp extends Application {
    */
   private void signAll() {
     JobPlan job = new JobPlan(documents, selectedShape(), pinPolicy());
+    if (job.exceedsHeldPinLimit()) {
+      results.getItems().setAll(job.summary());
+      return;
+    }
     // Asked once, here, for the whole job: the card verifies PIN 2 per
     // signature but does not require a person to answer per signature.
     char[] pin = null;
