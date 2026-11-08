@@ -4,7 +4,8 @@ Date: 2026-08-09
 
 ## Status
 
-Proposed
+Proposed. The clause that forbids caching PIN 2 is superseded by
+ADR-0008.
 
 ## Context
 
