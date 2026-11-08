@@ -31,11 +31,13 @@ import java.util.List;
 /**
  * The card, asked for one signature at a time.
  *
- * <p>Every method here makes exactly one signature and therefore
- * costs exactly one PIN 2: the card verifies it per signature and
- * never caches it, and nothing in this application may reduce that
- * count (ADR-0007). A caller signing twelve documents separately calls
- * this twelve times and the holder answers twelve times.
+ * <p>Every method here makes exactly one signature, and the card
+ * verifies PIN 2 for it: the card keeps no verification from one
+ * signature to the next. A caller signing twelve documents separately
+ * calls this twelve times. When the token has the caller supply PIN 2,
+ * the holder types it once and this class presents the same value for
+ * each signature of the job (ADR-0008); otherwise the holder answers
+ * twelve times.
  */
 public final class CardSigner implements AutoCloseable {
 
