@@ -70,14 +70,16 @@
 
 ## Independent review
 
-- Before a pull request merges, review its diff independently with the `agy`
-  CLI and `gemini-3.8-flash-high` always, plus a free OpenCode model for
-  protocol, cryptography or state-machine changes (`opencode models | grep
-  ^opencode`; deepseek and glm are usually good, and another one can be too).
+- Before a pull request merges, review its diff independently: always with
+  the `agy` CLI and `gemini-3.8-flash-high`, and for protocol, cryptography
+  or state-machine changes also with the `opencode` CLI and a free OpenCode
+  model (`opencode models | grep ^opencode` lists them; deepseek and glm are
+  usually good, and another one can be too).
 - Run each reviewer headless and read-only from an empty directory, with the
   diff pasted into the prompt and no tool use. Frame the request as a code
   review from the project's author:
   `agy --sandbox --mode plan --model gemini-3.8-flash-high -p "$prompt"` and
-  `opencode run --archived --agent plan -m opencode/<model> "$prompt"`.
+  `opencode run --archived --agent plan -m <model> "$prompt"`, where
+  `<model>` is a listed name such as `opencode/glm-5.3-flash-free`.
 - Check every finding against the code. Fix the real ones and list the
   rejected ones, with the reason, in the pull request description.
