@@ -18,6 +18,12 @@ import java.util.List;
  */
 public record JobPlan(List<Path> documents, JobShape shape, PinPolicy pin) {
 
+  /**
+   * The most signatures one entry of PIN 2 may authorize when the
+   * application holds it for the job (ADR-0008).
+   */
+  public static final int MAX_SIGNATURES_PER_HELD_PIN = 25;
+
   public JobPlan {
     documents = List.copyOf(documents);
     if (documents.isEmpty()) {
@@ -45,8 +51,24 @@ public record JobPlan(List<Path> documents, JobShape shape, PinPolicy pin) {
     return pin == PinPolicy.ASK_ONCE_FOR_THE_JOB ? 1 : signatureCount();
   }
 
+  /**
+   * Whether the application would hold PIN 2 for more signatures than
+   * ADR-0008 allows. A container is one signature however many
+   * documents it holds, and a token that collects PIN 2 itself never
+   * has the application hold it, so neither can exceed the limit.
+   */
+  public boolean exceedsHeldPinLimit() {
+    return pin == PinPolicy.ASK_ONCE_FOR_THE_JOB
+        && signatureCount() > MAX_SIGNATURES_PER_HELD_PIN;
+  }
+
   /** One sentence to put in front of a holder before starting. */
   public String summary() {
+    if (exceedsHeldPinLimit()) {
+      return documents.size() + " documents signed separately need more than one entry of PIN 2"
+          + " may cover (" + MAX_SIGNATURES_PER_HELD_PIN + " signatures at most); choose fewer"
+          + " documents, or one signed container";
+    }
     int prompts = pinEntries();
     String documentCount = documents.size() == 1
         ? "1 document"
