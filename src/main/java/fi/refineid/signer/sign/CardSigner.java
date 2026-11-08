@@ -34,10 +34,9 @@ import java.util.List;
  * <p>Every method here makes exactly one signature, and the card
  * verifies PIN 2 for it: the card keeps no verification from one
  * signature to the next. A caller signing twelve documents separately
- * calls this twelve times. An instance opened with PIN 2 supplies that
- * value for every signature made through it (ADR-0008); one opened
- * without it leaves the token to collect PIN 2, and the holder answers
- * twelve times.
+ * makes twelve signing calls. An instance opened with PIN 2 supplies
+ * that value for every signature made through it (ADR-0008); one opened
+ * without it leaves the token to collect PIN 2 for each signature.
  */
 public final class CardSigner implements AutoCloseable {
 

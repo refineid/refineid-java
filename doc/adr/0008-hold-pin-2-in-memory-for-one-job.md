@@ -1,10 +1,11 @@
-# 8. Hold PIN 2 in memory for the length of one job
+# 8. Hold PIN 2 in memory for one job
 
 Date: 2026-11-08
 
 ## Status
 
-Accepted. Supersedes the clause of ADR-0007 that forbids caching PIN 2.
+Accepted. Supersedes the clause of ADR-0007 that forbids caching, replaying
+or pre-collecting PIN 2.
 
 ## Context
 
@@ -27,7 +28,7 @@ The implementation already works this way as
   for each signature of the job. The card still verifies it for every
   signature.
 - Before the entry, the application says how many signatures that entry
-  authorizes. The job plan and the PIN dialog do.
+  authorizes. The job plan and the PIN dialog both say it.
 - The application keeps its own copy of PIN 2 only in memory, as a
   `char[]`, for the length of one job. It never writes it to disk: no
   file, preference, keychain entry or log line.
@@ -48,6 +49,8 @@ The implementation already works this way as
   the container form (one signature, one PIN 2) is offered and that the
   interface states the number of PIN 2 entries before a job starts.
 - The zeroing covers the array the application owns. The text typed into
-  the JavaFX password field exists as a Java `String` inside the control
-  until it is garbage collected, and copies held by the PKCS#11 provider
-  or EU DSS were not examined. This application cannot zero either.
+  the JavaFX password field exists as Java `String` objects, in the
+  control and in the result of the `getText()` call that reads it, until
+  they are garbage collected, and this application cannot zero a
+  `String`. Copies held by the PKCS#11 provider or EU DSS were not
+  examined.
