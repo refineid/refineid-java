@@ -22,21 +22,22 @@ The implementation already works this way as
 
 ## Decision
 
-- When the token expects the caller to supply PIN 2, the holder may type
-  it once for a job, and the application presents that value to the card
+- When the token expects the caller to supply PIN 2, the holder types it
+  once for a job, and the application presents that value to the card
   for each signature of the job. The card still verifies it for every
   signature.
 - Before the entry, the application says how many signatures that entry
   authorizes. The job plan and the PIN dialog do.
-- The application keeps PIN 2 only in memory, as a `char[]`, for the
-  length of one job. It never writes it to disk: no file, preference,
-  keychain entry or log line.
-- The application overwrites it with zeros when the job ends, whether
-  the job completes, fails or is stopped.
+- The application keeps its own copy of PIN 2 only in memory, as a
+  `char[]`, for the length of one job. It never writes it to disk: no
+  file, preference, keychain entry or log line.
+- The application overwrites that copy with zeros when the job ends,
+  whether the job completes, fails or is stopped.
 - Nothing carries PIN 2 from one job to the next.
-- Asking for PIN 2 for each signature (`PinPolicy.ASK_EACH_SIGNATURE`)
-  stays, and it is what happens when the token collects PIN 2 itself:
-  the application then never sees the value.
+- When the token collects PIN 2 itself (`PinPolicy.ASK_EACH_SIGNATURE`),
+  a system dialog asks for each signature and the application never sees
+  the value. The token decides which of the two cases applies; the
+  holder does not choose.
 - This decision is for a small batch of documents in one job. It sets no
   number of documents.
 
