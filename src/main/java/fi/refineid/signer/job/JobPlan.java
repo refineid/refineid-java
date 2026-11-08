@@ -65,9 +65,9 @@ public record JobPlan(List<Path> documents, JobShape shape, PinPolicy pin) {
   /** One sentence to put in front of a holder before starting. */
   public String summary() {
     if (exceedsHeldPinLimit()) {
-      return documents.size() + " documents signed separately is more than one entry of PIN 2"
-          + " may cover (" + MAX_SIGNATURES_PER_HELD_PIN + " at most); choose fewer documents,"
-          + " or one signed container";
+      return documents.size() + " documents signed separately need more than one entry of PIN 2"
+          + " may cover (" + MAX_SIGNATURES_PER_HELD_PIN + " signatures at most); choose fewer"
+          + " documents, or one signed container";
     }
     int prompts = pinEntries();
     String documentCount = documents.size() == 1

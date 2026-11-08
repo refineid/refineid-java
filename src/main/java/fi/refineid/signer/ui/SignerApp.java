@@ -92,9 +92,7 @@ public final class SignerApp extends Application {
     separately.setUserData(JobShape.EACH_DOCUMENT);
     shapes.selectedToggleProperty().addListener((source, was, now) -> {
       refreshPlan();
-      if (!signing) {
-        sign.setDisable(!canSign());
-      }
+      sign.setDisable(!canSign());
     });
 
     drop = dropArea();
@@ -270,9 +268,10 @@ public final class SignerApp extends Application {
     return (JobShape) shapes.getSelectedToggle().getUserData();
   }
 
-  /** Whether there is a job this window is willing to start. */
+  /** Whether there is a job this window is willing to start now. */
   private boolean canSign() {
-    return !documents.isEmpty()
+    return !signing
+        && !documents.isEmpty()
         && credentialUsable
         && !new JobPlan(documents, selectedShape(), pinPolicy()).exceedsHeldPinLimit();
   }
@@ -362,7 +361,7 @@ public final class SignerApp extends Application {
         }
         signing = false;
         Platform.runLater(() -> {
-          sign.setDisable(false);
+          sign.setDisable(!canSign());
           readCard();
         });
       }
