@@ -9,23 +9,23 @@ import eu.europa.esig.dss.model.DSSDocument;
 import eu.europa.esig.dss.model.FileDocument;
 import eu.europa.esig.dss.model.SignatureValue;
 import eu.europa.esig.dss.model.ToBeSigned;
-import eu.europa.esig.dss.pades.PAdESSignatureParameters;
-import eu.europa.esig.dss.pades.signature.PAdESService;
-import eu.europa.esig.dss.service.ocsp.OnlineOCSPSource;
-import eu.europa.esig.dss.service.http.commons.TimestampDataLoader;
-import eu.europa.esig.dss.service.tsp.OnlineTSPSource;
 import eu.europa.esig.dss.model.x509.CertificateToken;
 import eu.europa.esig.dss.model.x509.revocation.ocsp.OCSP;
+import eu.europa.esig.dss.pades.PAdESSignatureParameters;
+import eu.europa.esig.dss.pades.signature.PAdESService;
+import eu.europa.esig.dss.service.http.commons.TimestampDataLoader;
+import eu.europa.esig.dss.service.ocsp.OnlineOCSPSource;
+import eu.europa.esig.dss.service.tsp.OnlineTSPSource;
+import eu.europa.esig.dss.spi.validation.CommonCertificateVerifier;
 import eu.europa.esig.dss.spi.x509.aia.DefaultAIASource;
 import eu.europa.esig.dss.spi.x509.revocation.RevocationToken;
-import fi.refineid.signer.card.CardFailure;
-import fi.refineid.signer.card.CredentialStatus;
-import eu.europa.esig.dss.spi.validation.CommonCertificateVerifier;
 import eu.europa.esig.dss.token.DSSPrivateKeyEntry;
 import eu.europa.esig.dss.token.PasswordInputCallback;
 import eu.europa.esig.dss.token.Pkcs11SignatureToken;
+import fi.refineid.signer.card.CardFailure;
+import fi.refineid.signer.card.CredentialStatus;
 import java.nio.file.Path;
-import java.util.Locale;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -34,11 +34,12 @@ import java.util.List;
  * <p>Every method here makes exactly one signature, and the card
  * verifies PIN 2 for it: the card keeps no verification from one
  * signature to the next. A caller signing twelve documents separately
- * makes twelve signing calls. An instance opened with PIN 2 supplies
- * that value for every signature made through it (ADR-0008); one opened
+ * makes twelve signing calls. An instance opened with PIN 2 keeps its
+ * own defensive copy in memory for every signature made through it
+ * until it is closed or the card refuses PIN 2 (ADR-0008); one opened
  * without it leaves the token to collect PIN 2 for each signature.
  */
-public final class CardSigner implements AutoCloseable {
+public final class CardSigner implements DocumentSigner, AutoCloseable {
 
   /** Where the signing module is installed on macOS. */
   public static final Path INSTALLED_MODULE =
@@ -66,6 +67,15 @@ public final class CardSigner implements AutoCloseable {
    */
   public static final String KEY_PROPERTY = "refineid.key";
 
+  /** Minimal token seam for signing and closing, decoupling tests from PKCS#11 hardware. */
+  interface SignToken extends AutoCloseable {
+    SignatureValue sign(
+        ToBeSigned dataToSign, DigestAlgorithm digestAlgorithm, DSSPrivateKeyEntry key);
+
+    @Override
+    void close();
+  }
+
   /**
    * The module this run will use: the installed one unless another was
    * named.
@@ -75,12 +85,19 @@ public final class CardSigner implements AutoCloseable {
     return named == null ? INSTALLED_MODULE : Path.of(named);
   }
 
-  private final Pkcs11SignatureToken token;
+  private final SignToken token;
   private final DSSPrivateKeyEntry key;
+  private final char[] heldPin;
+  private boolean pinRejected;
 
-  private CardSigner(Pkcs11SignatureToken token, DSSPrivateKeyEntry key) {
+  CardSigner(SignToken token, DSSPrivateKeyEntry key, char[] ownedHeldPin) {
     this.token = token;
     this.key = key;
+    this.heldPin = ownedHeldPin;
+  }
+
+  static CardSigner forTest(SignToken token, DSSPrivateKeyEntry key, char[] pin) {
+    return new CardSigner(token, key, pin == null ? null : pin.clone());
   }
 
   /**
@@ -102,13 +119,14 @@ public final class CardSigner implements AutoCloseable {
    *
    * <p>For a session that cannot answer a dialog -- headless, remote,
    * a test -- where the module is run with textual PIN entry and
-   * withdraws its protected-authentication-path flag. The value is
-   * held only for the call that hands it to the module, which passes
-   * it to the card as an authentication context; nothing here stores
-   * it, writes it, or puts it in a message.
+   * withdraws its protected-authentication-path flag. A defensive copy
+   * of {@code pin} is held only in memory for this instance and zeroed
+   * on close, on open failure, or on the first PIN refusal; callers
+   * remain responsible for zeroing their own input array.
    */
   public static CardSigner open(Path module, char[] pin) throws SigningFailedException {
-    Pkcs11SignatureToken token = null;
+    char[] held = pin == null ? null : pin.clone();
+    Pkcs11SignatureToken pkcs11 = null;
     try {
       // Selected by position in the slot list, not by slot number. The
       // module numbers slots as it finds identities and builds that
@@ -116,20 +134,38 @@ public final class CardSigner implements AutoCloseable {
       // slot that does not exist yet and the card answers
       // CKR_SLOT_ID_INVALID. A negative slot id is how DSS is told to
       // use the index instead.
-      PasswordInputCallback password = pin == null ? null : () -> pin;
-      token = new Pkcs11SignatureToken(module.toString(), password, -1, slot(), null);
-      return new CardSigner(token, signingKey(token.getKeys()));
+      PasswordInputCallback password = held == null ? null : () -> held;
+      pkcs11 = new Pkcs11SignatureToken(module.toString(), password, -1, slot(), null);
+      DSSPrivateKeyEntry chosenKey = signingKey(pkcs11.getKeys());
+      Pkcs11SignatureToken openToken = pkcs11;
+      SignToken adapted =
+          new SignToken() {
+            @Override
+            public SignatureValue sign(
+                ToBeSigned dataToSign, DigestAlgorithm digestAlgorithm, DSSPrivateKeyEntry entry) {
+              return openToken.sign(dataToSign, digestAlgorithm, entry);
+            }
+
+            @Override
+            public void close() {
+              openToken.close();
+            }
+          };
+      return new CardSigner(adapted, chosenKey, held);
     } catch (SigningFailedException alreadyExplained) {
-      closeQuietly(token);
+      zero(held);
+      closeQuietly(pkcs11);
       throw alreadyExplained;
     } catch (Exception failure) {
-      closeQuietly(token);
-      throw new SigningFailedException(CardFailure.from(failure).sentence(), failure);
+      zero(held);
+      closeQuietly(pkcs11);
+      throw SigningFailedException.cardFailure(
+          CardFailure.from(failure), "The card could not be opened");
     }
   }
 
-
   /** Signs one PDF into itself, as PAdES. One PIN 2. */
+  @Override
   public void signPdf(Path document, Path output) throws SigningFailedException {
     try {
       DSSDocument toSign = new FileDocument(document.toFile());
@@ -142,8 +178,10 @@ public final class CardSigner implements AutoCloseable {
       PAdESService service = new PAdESService(new CommonCertificateVerifier());
       service.setTspSource(timestamps());
       ToBeSigned dataToSign = service.getDataToSign(toSign, parameters);
-      SignatureValue signature = token.sign(dataToSign, parameters.getDigestAlgorithm(), key);
+      SignatureValue signature = signWithToken(dataToSign, parameters.getDigestAlgorithm());
       service.signDocument(toSign, parameters, signature).save(output.toString());
+    } catch (SigningFailedException alreadyClassified) {
+      throw alreadyClassified;
     } catch (Exception failure) {
       throw new SigningFailedException(document + " was not signed", failure);
     }
@@ -153,6 +191,7 @@ public final class CardSigner implements AutoCloseable {
    * Signs any number of documents into one ASiC-E container. One PIN 2
    * however many went in.
    */
+  @Override
   public void signContainer(List<Path> documents, Path output) throws SigningFailedException {
     try {
       List<DSSDocument> toSign = documents.stream()
@@ -168,11 +207,42 @@ public final class CardSigner implements AutoCloseable {
       ASiCWithXAdESService service = new ASiCWithXAdESService(new CommonCertificateVerifier());
       service.setTspSource(timestamps());
       ToBeSigned dataToSign = service.getDataToSign(toSign, parameters);
-      SignatureValue signature = token.sign(dataToSign, parameters.getDigestAlgorithm(), key);
+      SignatureValue signature = signWithToken(dataToSign, parameters.getDigestAlgorithm());
       service.signDocument(toSign, parameters, signature).save(output.toString());
+    } catch (SigningFailedException alreadyClassified) {
+      throw alreadyClassified;
     } catch (Exception failure) {
       throw new SigningFailedException("the container was not signed", failure);
     }
+  }
+
+  SignatureValue signWithToken(ToBeSigned dataToSign, DigestAlgorithm digestAlgorithm)
+      throws SigningFailedException {
+    if (pinRejected) {
+      throw SigningFailedException.pinFailure("The card refused that PIN");
+    }
+    try {
+      return token.sign(dataToSign, digestAlgorithm, key);
+    } catch (Exception failure) {
+      CardFailure cardFailure = CardFailure.from(failure);
+      if (cardFailure.isPinFailure()) {
+        pinRejected = true;
+        zero(heldPin);
+      }
+      throw SigningFailedException.cardFailure(cardFailure, "The card did not sign");
+    }
+  }
+
+  boolean isHeldPinZeroedForTest() {
+    if (heldPin == null) {
+      return true;
+    }
+    for (char ch : heldPin) {
+      if (ch != '\0') {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
@@ -310,6 +380,11 @@ public final class CardSigner implements AutoCloseable {
     return null;
   }
 
+  /** Which cryptosystem the chosen key uses, for a report to name. */
+  public String keyAlgorithm() {
+    return key.getCertificate().getPublicKey().getAlgorithm();
+  }
+
   /**
    * Who the signature will name, as the certificate writes it.
    *
@@ -317,11 +392,6 @@ public final class CardSigner implements AutoCloseable {
    * window says who is signing, and the rest of the subject is for the
    * diagnostic report.
    */
-  /** Which cryptosystem the chosen key uses, for a report to name. */
-  public String keyAlgorithm() {
-    return key.getCertificate().getPublicKey().getAlgorithm();
-  }
-
   public String signerName() {
     String subject = key.getCertificate().getSubject().getPrettyPrintRFC2253();
     for (String part : subject.split(",")) {
@@ -333,6 +403,12 @@ public final class CardSigner implements AutoCloseable {
     return subject;
   }
 
+  private static void zero(char[] secret) {
+    if (secret != null) {
+      Arrays.fill(secret, '\0');
+    }
+  }
+
   private static void closeQuietly(Pkcs11SignatureToken token) {
     if (token != null) {
       token.close();
@@ -341,6 +417,7 @@ public final class CardSigner implements AutoCloseable {
 
   @Override
   public void close() {
+    zero(heldPin);
     token.close();
   }
 }

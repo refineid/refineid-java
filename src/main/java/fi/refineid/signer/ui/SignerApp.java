@@ -327,7 +327,7 @@ public final class SignerApp extends Application {
     Path destination = documents.getFirst().getParent();
     signing = true;
     Thread.ofVirtual().start(() -> {
-      try (CardSigner card = CardSigner.open(CardSigner.defaultModule(), held)) {
+      try (CardSigner card = openSigner(held)) {
         new SigningJob(card, destination).run(job, new SigningJob.Progress() {
           @Override
           public void starting(Path document, int number, int total) {
@@ -355,10 +355,6 @@ public final class SignerApp extends Application {
       } catch (SigningFailedException failure) {
         report(failure.getMessage());
       } finally {
-        if (held != null) {
-          // The job is over; the value goes with it.
-          java.util.Arrays.fill(held, '\0');
-        }
         signing = false;
         Platform.runLater(() -> {
           sign.setDisable(!canSign());
@@ -366,6 +362,17 @@ public final class SignerApp extends Application {
         });
       }
     });
+  }
+
+  private static CardSigner openSigner(char[] pin) throws SigningFailedException {
+    try {
+      return CardSigner.open(CardSigner.defaultModule(), pin);
+    } finally {
+      if (pin != null) {
+        // CardSigner keeps its own copy for the job; clear the UI prompt buffer immediately.
+        java.util.Arrays.fill(pin, '\0');
+      }
+    }
   }
 
   private void report(String line) {

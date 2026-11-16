@@ -33,7 +33,11 @@ The implementation already works this way as
   `char[]`, for the length of one job. It never writes it to disk: no
   file, preference, keychain entry or log line.
 - The application overwrites that copy with zeros when the job ends,
-  whether the job completes, fails or is stopped.
+  whether the job completes, fails or is stopped, and immediately on
+  the first PIN refusal or PIN lock.
+- A PIN refusal or PIN lock stops the job at once and skips any
+  remaining documents without contacting the card again, so one mistyped
+  PIN 2 never spends further attempts across a batch.
 - Nothing carries PIN 2 from one job to the next.
 - When the token collects PIN 2 itself (`PinPolicy.ASK_EACH_SIGNATURE`),
   a system dialog asks for each signature and the application never sees
