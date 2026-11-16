@@ -23,7 +23,9 @@ public sealed interface DocumentOutcome {
   }
 
   /**
-   * Not attempted, because the holder stopped the job first.
+   * Not attempted, because the job stopped before reaching it (either
+   * cancelled by the holder or halted after the card refused or blocked
+   * PIN 2).
    *
    * <p>Distinct from a failure: nothing went wrong with this document
    * and nothing was spent on it.

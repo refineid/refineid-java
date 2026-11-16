@@ -1,6 +1,6 @@
 package fi.refineid.signer.job;
 
-import fi.refineid.signer.sign.CardSigner;
+import fi.refineid.signer.sign.DocumentSigner;
 import fi.refineid.signer.sign.SigningFailedException;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -16,10 +16,13 @@ import java.util.Locale;
  * whether the holder authorizes once, over a container, or once per
  * document (ADR-0007).
  *
- * <p>A job runs to the end. A document that fails does not discard the
- * ones already signed and does not stop the ones after it, because a
- * batch that abandons eleven good signatures over one bad file has
- * spent eleven PIN entries for nothing.
+ * <p>A document failure that does not implicate PIN 2 keeps the
+ * signatures already written and proceeds to the remaining files,
+ * because abandoning eleven good signatures over one unreadable file
+ * spends eleven PIN entries for nothing. A PIN refusal or PIN lock
+ * stops the job immediately and leaves the remaining documents
+ * unattempted so a rejected PIN is never presented to the card again
+ * (ADR-0008).
  */
 public final class SigningJob {
 
@@ -41,10 +44,10 @@ public final class SigningJob {
     boolean cancelled();
   }
 
-  private final CardSigner signer;
+  private final DocumentSigner signer;
   private final Path destination;
 
-  public SigningJob(CardSigner signer, Path destination) {
+  public SigningJob(DocumentSigner signer, Path destination) {
     this.signer = signer;
     this.destination = destination;
   }
@@ -87,22 +90,30 @@ public final class SigningJob {
   private List<DocumentOutcome> runSeparately(JobPlan plan, Progress progress) {
     List<DocumentOutcome> outcomes = new ArrayList<>();
     List<Path> documents = plan.documents();
+    boolean haltedByPinFailure = false;
     for (int index = 0; index < documents.size(); index++) {
       Path document = documents.get(index);
-      if (progress.cancelled()) {
+      if (haltedByPinFailure || progress.cancelled()) {
         DocumentOutcome skipped = new DocumentOutcome.Skipped(document);
         outcomes.add(skipped);
         progress.finished(skipped);
         continue;
       }
       progress.starting(document, index + 1, documents.size());
-      outcomes.add(signOne(document, progress));
+      StepResult result = signOne(document, progress);
+      outcomes.add(result.outcome());
+      if (result.stopBatch()) {
+        haltedByPinFailure = true;
+      }
     }
     return outcomes;
   }
 
-  private DocumentOutcome signOne(Path document, Progress progress) {
+  private record StepResult(DocumentOutcome outcome, boolean stopBatch) {}
+
+  private StepResult signOne(Path document, Progress progress) {
     DocumentOutcome outcome;
+    boolean stopBatch = false;
     try {
       Instant signedAt = Instant.now();
       if (isPdf(document)) {
@@ -118,19 +129,25 @@ public final class SigningJob {
       }
     } catch (SigningFailedException failure) {
       outcome = new DocumentOutcome.Failed(document, reason(failure));
+      stopBatch = failure.isPinFailure();
     }
     progress.finished(outcome);
-    return outcome;
+    return new StepResult(outcome, stopBatch);
   }
 
   private static boolean isPdf(Path document) {
     return document.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".pdf");
   }
 
-
-
-  /** The failure as one sentence, with the cause when it adds anything. */
+  /**
+   * The failure as one sentence: PIN failures keep {@code CardFailure}'s
+   * holder sentence without provider stack detail; document failures add
+   * the underlying cause when it adds anything.
+   */
   private static String reason(SigningFailedException failure) {
+    if (failure.isPinFailure()) {
+      return failure.getMessage();
+    }
     Throwable cause = failure.getCause();
     if (cause == null || cause.getMessage() == null) {
       return failure.getMessage();
