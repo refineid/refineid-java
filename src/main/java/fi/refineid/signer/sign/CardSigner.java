@@ -19,6 +19,7 @@ import eu.europa.esig.dss.service.tsp.OnlineTSPSource;
 import eu.europa.esig.dss.spi.validation.CommonCertificateVerifier;
 import eu.europa.esig.dss.spi.x509.aia.DefaultAIASource;
 import eu.europa.esig.dss.spi.x509.revocation.RevocationToken;
+import eu.europa.esig.dss.spi.x509.tsp.TSPSource;
 import eu.europa.esig.dss.token.DSSPrivateKeyEntry;
 import eu.europa.esig.dss.token.PasswordInputCallback;
 import eu.europa.esig.dss.token.Pkcs11SignatureToken;
@@ -296,8 +297,12 @@ public final class CardSigner implements DocumentSigner, AutoCloseable {
     }
   }
 
+  private static final int TIMESTAMP_CONNECT_TIMEOUT_MS = 15_000;
+  private static final int TIMESTAMP_RESPONSE_TIMEOUT_MS = 30_000;
+
   /**
-   * The authority a signature is stamped by, as this machine is set.
+   * The authority a signature is stamped by, as this machine is set,
+   * spaced across separate documents by {@link TimestampThrottle}.
    *
    * <p>Without a timestamp a signature carries only the time this
    * computer claimed, which nobody has to believe and a validator
@@ -305,17 +310,21 @@ public final class CardSigner implements DocumentSigner, AutoCloseable {
    * setting carries them, which is the case for an authority an
    * organization pays for rather than the shared qualified one.
    */
-  private static OnlineTSPSource timestamps() {
+  private static TSPSource timestamps() {
     TimestampSettings settings = TimestampSettings.stored();
     OnlineTSPSource source = new OnlineTSPSource(settings.address());
+    TimestampDataLoader loader = new TimestampDataLoader();
+    loader.setTimeoutConnection(TIMESTAMP_CONNECT_TIMEOUT_MS);
+    loader.setTimeoutConnectionRequest(TIMESTAMP_CONNECT_TIMEOUT_MS);
+    loader.setTimeoutResponse(TIMESTAMP_RESPONSE_TIMEOUT_MS);
+    loader.setTimeoutSocket(TIMESTAMP_RESPONSE_TIMEOUT_MS);
     if (settings.hasCredentials()) {
-      TimestampDataLoader loader = new TimestampDataLoader();
       loader.addAuthentication(
           settings.host(), settings.port(), "", settings.username(),
           settings.password().toCharArray());
-      source.setDataLoader(loader);
     }
-    return source;
+    source.setDataLoader(loader);
+    return TimestampThrottle.shared().forDocument(source);
   }
 
   /**
